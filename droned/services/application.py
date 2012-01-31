@@ -39,7 +39,6 @@ SERVICENAME = 'application'
 #this will be updated by the service loader and is an API requirement
 SERVICECONFIG = dictwrapper({
     'initial_delay': 1.0, #number of seconds to wait on start before scanning
-    'assimilate_interval': 60.0, #number of seconds to wait between assimilations
     'recover_interval': 10.0, #number of seconds to wait in between crash searches
     'recovery_period': 60 #number of seconds between recovery attempts
 })
@@ -51,13 +50,20 @@ pluginFactory.loadAppPlugins() #get all the app plugins ready to be used
 
 class ApplicationLoader(Service):
    scanning = defer.succeed(None)
-   assimilating = defer.succeed(None)
    tracking = set()
+   first_run = False
+
+   def _first_scan(self):
+       for pid in listProcesses():
+           try: AppProcess(Server(config.HOSTNAME), pid)
+           except InvalidProcess: pass
   
    def startService(self):
        """Start All AppManager Services"""
+       if self.scanning.called: #need to pre-populate values
+           self.scanning = defer.maybeDeferred(self._first_scan)
+       self.first_run = True
        self._task = task.LoopingCall(self.scan_app_instances)
-       self._task2 = task.LoopingCall(self.assimilate_app_instances)
 
        #plugins will be created and loaded when needed
        for shortname in config.APPLICATIONS.keys():
@@ -96,38 +102,30 @@ class ApplicationLoader(Service):
        reactor.callLater(SERVICECONFIG.initial_delay, self._start_all_tasks)
 
    def _start_all_tasks(self):
-#seems destructive       self.assimilate_app_instances() #make sure this runs first
        self._task.start(SERVICECONFIG.recover_interval)
-       self._task2.start(SERVICECONFIG.assimilate_interval)
 
    def scan_app_instances(self):
        """scan for instance anomolies and fire Events as needed"""
        if self.scanning.called:
+           need_scan = False
+           for am in AppManager.objects:
+               if not am.running: continue
+               if am.discover:
+                   need_scan = True
+                   break #an appmanager wan't help
+           if not need_scan: return
            self.scanning = self._scan()
        else:
            log('busy scanning from last interation')
-
-   def assimilate_app_instances(self):
-       """assimilate applications that started outside of droned"""
-       if self.assimilating.called:
-           self.assimilating = self._borg()
-       else:
-           log('busy assimilating from last interation')
 
    def reset_tracking(self, occurrence):
        """reset tracking criteria when an instance starts"""
        try: self.tracking.discard(occurrence.instance)
        except: pass
 
-#TODO this loop runs hot b/c of IO, consider a thread
+#TODO this loop runs hot b/c of IO, but most of the heavy work is in a thread
    @defer.deferredGenerator
    def _scan(self):
-       #wait for assimilation to finish
-       wfd = defer.waitForDeferred(self.assimilating)
-       yield wfd
-       try: wfd.getResult()
-       except: err('assimilation had an error')
-       #scan for all processes, hopefully we have seen them before
        for pid in listProcesses():
            try: AppProcess(Server(config.HOSTNAME), pid)
            except InvalidProcess: pass
@@ -138,18 +136,40 @@ class ApplicationLoader(Service):
            if not app.__class__.isValid(app): continue
            for ai in app.localappinstances:
                if not ai.__class__.isValid(ai): continue
+               if ai in self.tracking: continue
+               if not self.first_run: #avoid process table races
+                   self.tracking.add(ai)
+                   reactor.callLater(SERVICECONFIG.recovery_period,
+                       self.tracking.discard, ai
+                   )
+                   if not ai.enabled: continue #skip disabled
+               result = None
                if ai.running and not ai.shouldBeRunning:
                    ai.shouldBeRunning = True
-                   continue #work around first assimilated/never started
+               if ai.running: continue
+               manager = AppManager(ai.app.name)
+               if not manager.running:
+                   continue #skip managers that are not running
+               if not manager.discover:
+                   continue #app manager claims to be ok
+               #look for processes that we can assimilate
+               d = manager.model.findProcesses()
+               wfd = defer.waitForDeferred(d)
+               yield wfd
+               for (pid, result) in wfd.getResult():
+                   d = manager.model.assimilateProcess(result)
+                   wfd2 = defer.waitForDeferred(d)
+                   yield wfd2
+                   ai2 = wfd2.getResult()
+                   if ai2 and isinstance(ai2, AppInstance) and ai2 is ai:
+                       Event('instance-found').fire(instance=ai)
+                       manager.log('Sucessfully assimilated PID %d' % ai2.pid)
+               if ai.running: continue #may have assimilated the app
                if not ai.crashed: continue
                if not ai.enabled: continue #disabled instances are not actionable
-               if ai in self.tracking: continue
+               if self.first_run: continue #avoid process table races
                Event('instance-crashed').fire(instance=ai)
                #cool off on eventing for a little while
-               self.tracking.add(ai)
-               reactor.callLater(SERVICECONFIG.recovery_period,
-                   self.tracking.discard, ai
-               )
        #keep the process objects up to date
        for process in AppProcess.objects:
            try:
@@ -163,39 +183,7 @@ class ApplicationLoader(Service):
        wfd = defer.waitForDeferred(d)
        yield wfd
        wfd.getResult()
-       yield 'done'
-
-   @defer.deferredGenerator
-   def _borg(self):
-       """assimilation routine"""
-       server = Server(config.HOSTNAME)
-       #wait for scanning to finish
-       wfd = defer.waitForDeferred(self.scanning)
-       yield wfd
-       try: wfd.getResult()
-       except: err('scanning had an error')
-       for manager in AppManager.objects:
-           if not manager.running:
-               continue #skip managers that are not running
-           if not manager.discover:
-               continue #appmanager is happy, no need to look
-           d = manager.model.findProcesses()
-           wfd = defer.waitForDeferred(d)
-           yield wfd
-           for (pid, result) in wfd.getResult():
-               d = manager.model.assimilateProcess(result)
-               wfd2 = defer.waitForDeferred(d)
-               yield wfd2
-               ai = wfd2.getResult()
-               if ai and isinstance(ai, AppInstance):
-                   ai.pid = int(result['pid']) #just make sure!!!
-                   Event('instance-found').fire(instance=ai)
-                   manager.log('Sucessfully assimilated PID %(pid)d' % result)
-       d = defer.Deferred()
-       reactor.callLater(0.01, d.callback, None)
-       wfd = defer.waitForDeferred(d)
-       yield wfd
-       wfd.getResult()
+       self.first_run = False
        yield 'done'
 
    def stopService(self):
@@ -212,7 +200,6 @@ class ApplicationLoader(Service):
                #plugins are stateless by design
                pluginFactory.delete_plugin(manager.model)
        if self._task.running: self._task.stop()
-       if self._task2.running: self._task2.stop()
        Service.stopService(self)
 
    #!!!Note docstring is funny for admin usage over blaster
