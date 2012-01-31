@@ -40,7 +40,7 @@ class AppProcess(Entity):
     managed = property(lambda s: AppProcess.isValid(s) and \
             isinstance(s.appinstance, AppInstance) and \
             s.appinstance.__class__.isValid(s.appinstance))
-    serializable = True
+#    serializable = True
     localInstall = property(lambda s: bool(s.server.hostname == \
             config.HOSTNAME))
 
@@ -429,14 +429,20 @@ class AppInstance(Entity):
         elif IDroneModelAppProcess.providedBy(self._process) and not \
                 AppProcess.isValid(self._process):
             self._process = IKittNullProcess(self)
+        #keep the journal up to date
+        self.info.update({
+            'pid': self._process.pid,
+            'inode': self._process.inode,
+        })
         return self._process
 
     def __getstate__(self):
         state = {
           'server': self.server.hostname,
           'app': self.app.name,
-          'pid': self.pid,
-          'inode': self.inode,
+          #avoid journal races
+          'pid': self.info.get('pid',0),
+          'inode': self.info.get('inode',0),
           'version': self.version, #for proper serialization
           'label': self.label,
           'shouldBeRunning': self.shouldBeRunning,
@@ -458,13 +464,19 @@ class AppInstance(Entity):
         version = AppVersion.makeAppVersion(appname, state['version'])
         appinstance = AppInstance(server, App(appname), state['label'])
         appinstance.appversion = version
-        appinstance.inode = state.get('inode',0)
-        appinstance.pid = state.get('pid',0)
+        pid = state.get('pid',0)
+        inode = state.get('inode',0)
+        from kitt.proc import isRunning
+        if pid and isRunning(pid):
+            appinstance.info.update({'pid': pid, 'inode': inode})
+            process = AppProcess(server, pid)
+            if process.inode == inode:
+                setattr(appinstance, '_process', process)
+        appinstance.updateInfo(state['info'])
         appinstance.enabled = state.get('enabled', False)
         appinstance.shouldBeRunning = state.get('shouldBeRunning', False)
         x = appinstance.running #preload the process information
         #attempt to get our instance into the last known state
-        appinstance.updateInfo(state['info'])
         return appinstance
 
     def updateInfo(self, info):
@@ -475,6 +487,9 @@ class AppInstance(Entity):
             if info: info = info.resultContext
         if not isinstance(info, dict):
             return result
+        #don't allow dumb changes
+        info.pop('pid', None)
+        info.pop('inode', None)
         self.info.update(dict(**info))
         return result
 
@@ -539,22 +554,26 @@ class AppInstance(Entity):
         pid = int(self.info.get('pid',0))
         if hasattr(self, '_process') and (self.process.pid != pid):
             delattr(self, '_process') #force rescan for process
+            pid = self.info['pid'] = 0
         return pid
     def _getinode(self):
         inode = int(self.info.get('inode',0))
         if hasattr(self, '_process') and (self.process.inode != inode):
             delattr(self, '_process') #force rescan for process
+            inode = self.info['inode'] = 0
         return inode
     def _setpid(self, pid):
         pid = int(pid)
-        if hasattr(self, '_process'):
+        if hasattr(self, '_process') and (self.process.pid != pid):
             delattr(self, '_process') #force update on change
         self.info['pid'] = pid
+        return self.info['pid']
     def _setinode(self, inode):
         inode = int(inode)
-        if hasattr(self, '_process'):
+        if hasattr(self, '_process') and (self.process.inode != inode):
             delattr(self, '_process') #force update on change
         self.info['inode'] = inode
+        return self.info['inode']
     def _getversion(self):
         if not hasattr(self, '_version'):
             self._version = AppVersion.makeAppVersion(self.app.name,None)

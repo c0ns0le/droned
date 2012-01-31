@@ -234,6 +234,7 @@ class ApplicationPlugin(object):
                 if data:
                     data = data.pop(0)[1] #we are just going to take the first
                     result.update(data) #we should have the pid captured
+            #this is the proper way to notify the AppInstance that we are running
             thisInst.pid = int(result.get('pid', 0))
         except:
             result = Failure()
@@ -262,7 +263,9 @@ class ApplicationPlugin(object):
         def safe_process(pid):
             try: #because processes can be invalid
                 return AppProcess(Server(config.HOSTNAME), pid)
-            except: return None
+            except:
+                err('problem')
+                return None
 
         if self.PROCESS_REGEX:
             #rescan the whole system for processes
@@ -330,7 +333,7 @@ class ApplicationPlugin(object):
                 assert not thisInst.running #make sure this instance isn't running
                 if bool(version) and (thisInst.version != version):
                     thisInst = self.setVersion(label, version)
-                thisInst.updateInfo({'pid': pid})
+                thisInst.pid = pid
                 result = thisInst
                 raise Exception('assimilated process')
             else: #make a best guess attempt
@@ -341,14 +344,14 @@ class ApplicationPlugin(object):
                 if bool(version): #try to perform a version match
                     for opt in options:
                         if opt.version == version:
-                            opt.updateInfo({'pid': pid})
+                            opt.pid = pid
                             result = opt
                             raise Exception('assimilated process')
                 #last ditch effort, pick lowest free container
                 thisInst = sorted([i for i in options if not i.running])[0]
                 if bool(version) and (thisInst.version != version):
                     thisInst = self.setVersion(thisInst.label, version)
-                thisInst.updateInfo({'pid': pid})
+                thisInst.pid = pid
                 result = thisInst
                 raise Exception('assimilated process')
         except: pass #swallow errors
