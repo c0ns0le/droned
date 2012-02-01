@@ -93,6 +93,8 @@ def command(executable, args, env, path, usePTY, childFD, protocol,
         from droned.management import dmx
         from droned.logging import log
         log('DroneD is daemonizing "%s" on your behalf' % (executable,))
+        if usePTY:
+            env['DRONED_USE_TTY'] = "1"
         #massage the commandline args
         if path:
             env['DRONED_PATH'] = path
