@@ -131,6 +131,8 @@ def whoami(hostname=MYHOSTNAME):
 import entity
 import foundation
 import grammars
+import context
+import hostdb
 #FIXME in flux
 #import rules
 
