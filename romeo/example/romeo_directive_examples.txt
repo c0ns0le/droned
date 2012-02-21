@@ -33,3 +33,22 @@ SERVICE_GROUP: &some_list2
 
 output:
 MY_LIST: [a,b,c,d,e,f]
+
+
+DIRECTIVE: ${ROMEO.merge_lists *some_list1,*some_list2}
+
+
+
+
+DIRECTIVE: ${ROMEO.decrypt some_method_lookup_string,some_method_arg1,some_method_arg2,...}
+------------------------------------------------------------------------
+this directive supports arbitrary decryption methods that must be
+registered as plugins in romeo.decryption.  your data is not 
+automatically decrypted in memory.  to use this feature you must use the
+method ``decrypt`` in romeo.decryption and pass the entire directive sting
+as the only argument to this method.  if the directive was not seen during
+the pre-processing phase the input will be returned to the caller.
+
+
+
+DIRECTIVE: ${ROMEO.decrypt rsa,/etc/pki/droned/local.public,a613455dbdf788604052e5035edbcd23b976b1d028fb046267c5a1a73b00304d2fcd....}
