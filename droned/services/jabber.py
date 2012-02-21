@@ -29,6 +29,8 @@ from twisted.words.protocols.jabber.sasl import SASLAuthError
 from twisted.words.protocols.jabber.xmlstream import *
 from twisted.words.xish.domish import Element, elementStream
 from droned.logging import logWithContext, err
+#support romeo encrypted data
+from romeo.decryption import decrypt
 
 import config
 import os
@@ -81,7 +83,7 @@ class JabberClient(object):
     def install(self, _parentService):
         """interface requirement"""
         self.parentService = _parentService
-        user = self.SERVICECONFIG.JABBER_USERNAME
+        user = decrypt(self.SERVICECONFIG.JABBER_USERNAME)
         server = self.SERVICECONFIG.JABBER_SERVER
         resource = self.SERVICECONFIG.JABBER_RESOURCE
         self.jid = JID("%(user)s@%(server)s/%(resource)s" % locals())
@@ -95,7 +97,7 @@ class JabberClient(object):
     def start(self):
         """interface requirement"""
         if self.running(): return
-        self.factory = XMPPClientFactory(self.jid, self.SERVICECONFIG.JABBER_PASSWORD)
+        self.factory = XMPPClientFactory(self.jid, decrypt(self.SERVICECONFIG.JABBER_PASSWORD))
         self.factory.addBootstrap(STREAM_CONNECTED_EVENT, self.connectionMade)
         self.factory.addBootstrap(STREAM_END_EVENT, self.connectionLost)
         self.factory.addBootstrap(STREAM_AUTHD_EVENT, self.connectionAuthenticated)
