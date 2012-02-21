@@ -107,6 +107,9 @@ class _PublicKey(object):
         """decrypt the rsa text field"""
         return _process(text, libcrypto.RSA_public_decrypt, self.key)
 
+#minimize the memory leak in the public key object
+from romeo.entity import ParameterizedSingleton
+_PublicKey = ParameterizedSingleton('_PublicKey', (_PublicKey,), {})
 
 #The real magic happens here
 def _process(source, func, key):

@@ -16,7 +16,7 @@
 
 import re
 from romeo.directives import Directive, DirectiveException
-from romeo.decryption import decrypt
+from romeo.decryption import setup
 import sys
 
 class Decrypt(Directive):
@@ -39,15 +39,13 @@ class Decrypt(Directive):
             if not m:
                 out.append(line)
                 continue
-            #extract our decryption parameters
-            args = self.extract_args(line[m.start():m.end()])
-            #replace the directive with the decrypted output
             try:
-                out.append(self.used_pattern.sub(decrypt(*args), line, 1))
+                #prepares this object for later decryption
+                setup(line[m.start():m.end()])
             except:
-                msg = "Failed to decrypt directive matching line\n"
+                msg = "Failed to setup decryption directive matching line\n"
                 msg += "%s" % str(line)
                 msg += "\n"
                 raise DirectiveException(msg)
-        results = "".join(out)
-        return results
+            out.append(line)
+        return "".join(out)

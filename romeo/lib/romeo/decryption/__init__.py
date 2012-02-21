@@ -54,6 +54,36 @@ class _decryptor(object):
         """execute the decryption method now"""
         return self._storage[args[0]](*args[1:])
 
+_decrypt = _decryptor()
+from romeo.entity import ParameterizedSingleton
+
+class _Decryption(object):
+    """encrypted data bucket, that decrypts the data on the fly."""
+    value = property(lambda s: _decrypt(*s._data))
+    def __init__(self, directive_string):
+        self._data = self.extract_args(directive_string)
+
+    @staticmethod
+    def extract_args(match_str):
+        match = match_str.strip().replace("}","")
+        match = match.split(" ")[1].strip()
+        match = match.split(",")
+        return tuple(match)
+
+#make this object unique based on the input parameters
+_Decryption = ParameterizedSingleton('_Decryption', (_Decryption,), {})
+
+def setup(directive_string):
+    """takes a directive string and prepares the value for later extraction."""
+    #the following is our only safety check
+    assert len(_Decryption.extract_args(directive_string))
+    _Decryption(directive_string)
+
+def decrypt(directive_string):
+    """takes a directive string and returns the decrypted value."""
+    if not _Decryption.exists(directive_string):
+        return directive_string
+    return _Decryption(directive_string).value
+
 #expose the class as a callable
-decrypt = _decryptor()
-__all__ = ['decrypt']
+__all__ = ['decrypt', 'setup']
