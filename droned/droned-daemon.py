@@ -79,6 +79,14 @@ class Daemon(Options):
         ["debug", "", False, "Don't install signal handlers and turn on debuggging", bool],
         ["hostdb","",os.path.join(os.path.sep,'etc','hostdb'), 
             "The directory to providing ROMEO configuration."],
+        ["rsadir","",os.path.join(os.path.sep,'etc','pki','droned'), 
+            "The directory to providing RSA keys."],
+        ["privatekey","","local", "Name of the Server Private RSA key."],
+        ["primefile","",os.path.join(os.path.sep,'usr','share','droned','primes'), 
+            "Location of prime numbers file."],
+        ["concurrency","", 5, 
+            "Maximum number of concurrent commands to execute against a remote droned.",
+            int],
     ])
     optFlags = [
         ["nodaemon", "n", "don't daemonize, don't use default umask of 0."],
@@ -88,6 +96,12 @@ class Daemon(Options):
     SIGNALS = dict((k, v) for v, k in signal.__dict__.iteritems() if \
             v.startswith('SIG') and not v.startswith('SIG_'))
 
+    MAX_CONCURRENCY = property(lambda s: s['concurrency'])
+    PRIMES_FILE = property(lambda s: s['primefile'])
+    RSA_DIR = property(lambda s: s['rsadir'])
+    RSA_MASTER_KEY_NAME = property(lambda s: s['privatekey'])
+    RSA_MASTER_KEY_FILE = property(lambda s: \
+            os.path.join(s.RSA_DIR, s.RSA_MASTER_KEY_NAME + '.private'))
     HOSTDB = property(lambda s: s['hostdb'])
     DEBUG = property(lambda s: s['debug'])
     CONFIGFILE = property(lambda s: s['config'])
@@ -441,16 +455,16 @@ class ConfigManager(Entity):
             'LOG_DIR': drone.LOG_DIR,
             'DEBUG_EVENTS': drone.DEBUG,
 #FIXME cli, config file override these ... some of it needs to go into services
-            'DRONED_PRIMES': '/usr/share/droned/primes',
-            'DRONED_KEY_DIR': '/etc/pki/droned',
-            'DRONED_MASTER_KEY_FILE': '/etc/pki/droned/local.private',
-            'DRONED_MASTER_KEY': rsa.PrivateKey('/etc/pki/droned/local.private'),
+            'DRONED_PRIMES': drone.PRIMES_FILE,
+            'DRONED_KEY_DIR': drone.RSA_DIR,
+            'DRONED_MASTER_KEY_FILE': drone.RSA_MASTER_KEY_FILE,
+            'DRONED_MASTER_KEY': rsa.PrivateKey(drone.RSA_MASTER_KEY_FILE),
             'DRONED_POLL_INTERVAL': 30,
             'SERVER_POLL_OFFSET': 0.333,
             'INSTANCE_POLL_INTERVAL': 1.0,
             'ACTION_EXPIRATION_TIME': 600,
             'DO_NOTHING_MODE': False,
-            'MAX_CONCURRENT_COMMANDS': 5,
+            'MAX_CONCURRENT_COMMANDS': drone.MAX_CONCURRENCY,
             'SERVER_MANAGEMENT_INTERVAL': 10,
         }
 

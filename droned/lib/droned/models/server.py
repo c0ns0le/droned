@@ -228,7 +228,7 @@ class DroneServer(Entity):
 
     def reload_action(self, argstr):
         """Usage: reload - reload droned rsa keys"""
-        self._keyRing.reloadKeys()
+        self.keyRing = RSAKeyRing('%s' % (config.DRONED_KEY_DIR,))
 
 
     def ping_action(self, argstr):

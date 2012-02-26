@@ -142,13 +142,18 @@ cat<<EOF_CONF > $RPM_BUILD_ROOT%{_sysconfdir}/%{name}/%{name}.conf
 [droned]
 homedir = /var/lib/droned
 journal = /var/lib/droned/journal
+hostdb = /etc/hostdb
+rsadir = /etc/pki/droned
+logdir = /var/log/droned
+primefile = /usr/share/droned/primes
+privatekey = local
+concurrency =  5
 umask = 0
 maxfd = 1024
 uid = nobody
 gid = nobody
 wait = 10
 deadline = 30
-logdir = /var/log/droned
 EOF_CONF
 
 
