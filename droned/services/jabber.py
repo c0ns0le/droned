@@ -31,8 +31,8 @@ from twisted.words.xish.domish import Element, elementStream
 from droned.logging import logWithContext, err
 #support romeo encrypted data
 from romeo.decryption import decrypt
-
 import config
+
 import os
 
 from kitt.util import dictwrapper
@@ -70,7 +70,6 @@ class JabberClient(object):
         'JABBER_VALIDATE_XML': True,
         'JABBER_TRUST_ROOM': False,
         'DEPUTY': 'admin@jabber.example.net',
-        'JABBER_TEAM_ROSTER': '/var/lib/droned/teams',
         'CONVERSATION_RESPONSE_PERIOD': 180,
         'JABBER_JOIN_CHATROOM': False,
         'JABBER_TEAM_ROSTER': os.path.join(config.DRONED_HOMEDIR, 'teams'),
@@ -97,10 +96,16 @@ class JabberClient(object):
     def start(self):
         """interface requirement"""
         if self.running(): return
-        self.factory = XMPPClientFactory(self.jid, decrypt(self.SERVICECONFIG.JABBER_PASSWORD))
+        self.factory = XMPPClientFactory(
+            self.jid,
+            decrypt(self.SERVICECONFIG.JABBER_PASSWORD)
+        )
         self.factory.addBootstrap(STREAM_CONNECTED_EVENT, self.connectionMade)
         self.factory.addBootstrap(STREAM_END_EVENT, self.connectionLost)
-        self.factory.addBootstrap(STREAM_AUTHD_EVENT, self.connectionAuthenticated)
+        self.factory.addBootstrap(
+            STREAM_AUTHD_EVENT,
+            self.connectionAuthenticated
+        )
         self.factory.addBootstrap(STREAM_ERROR_EVENT, self.receivedError)
         self.factory.addBootstrap(INIT_FAILED_EVENT, self.initFailed)
         self.service = TCPClient(
@@ -109,7 +114,13 @@ class JabberClient(object):
             self.factory
         )
         self.service.setServiceParent(self.parentService)
-        #build/rebuild jabber teams 
+        #build/rebuild jabber teams
+        if not os.path.exists(self.SERVICECONFIG.JABBER_TEAM_ROSTER):
+            try: os.makedirs(self.SERVICECONFIG.JABBER_TEAM_ROSTER)
+            except:
+                log('Cannot load team rosters because %s does not exits' % \
+                        self.SERVICECONFIG.JABBER_TEAM_ROSTER)
+                return
         for name in os.listdir(self.SERVICECONFIG.JABBER_TEAM_ROSTER):
             f = (self.SERVICECONFIG.JABBER_TEAM_ROSTER,name)
             if os.path.isfile('%s/%s' % f):
@@ -141,7 +152,9 @@ class JabberClient(object):
         log('connection authenticated')
         self.authenticated = True
         if not self.broadcastTask.running:
-            self.broadcastTask.start(self.SERVICECONFIG.JABBER_BROADCAST_INTERVAL)
+            self.broadcastTask.start(
+                self.SERVICECONFIG.JABBER_BROADCAST_INTERVAL
+            )
   
         xmlstream.addObserver('/message', self.receivedMessage)
         xmlstream.addObserver('/presence', self.receivedPresence)
@@ -162,7 +175,10 @@ class JabberClient(object):
         message['type'] = (groupChat and 'groupchat') or 'chat'
         message.addElement('body', None, body)
         if useHTML:
-            html = message.addElement('html', 'http://jabber.org/protocol/xhtml-im')
+            html = message.addElement(
+                'html',
+                'http://jabber.org/protocol/xhtml-im'
+            )
             htmlBody = html.addElement('body', 'http://www.w3.org/1999/xhtml')
             htmlBody.addRawXml( unicode(body) )
             if self.SERVICECONFIG.JABBER_VALIDATE_XML:

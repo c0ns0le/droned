@@ -73,8 +73,9 @@ class AppProcess(Entity):
                     raise InvalidProcess("Invalid PID (%s)" % pid)
                 raise #re-raise do avoid ending up in a pickle, literally
         except InvalidProcess:
-            AppProcess.delete(self) #make sure we are invalid
-            raise InvalidProcess("Invalid PID (%s)" % pid)
+            if config.HOSTNAME == self.server.hostname:
+                AppProcess.delete(self) #make sure we are invalid
+                raise InvalidProcess("Invalid PID (%s)" % pid)
         except IOError: #linux and solaris kitt.proc.LiveProcess use files
             AppProcess.delete(self) #make sure we are invalid
             raise InvalidProcess("Invalid PID (%s)" % pid)
@@ -91,8 +92,9 @@ class AppProcess(Entity):
             #adapt this model to a IKittProcess
             self._process = IKittProcess(self)
         elif self._process.pid != self.pid or not self._process.running:
-            AppProcess.delete(self) #take ourself out of serialization loop
-            self._process = IKittNullProcess(self) #continue to work for any other refs
+            if config.HOSTNAME == self.server.hostname:
+                AppProcess.delete(self) #take ourself out of serialization loop
+                self._process = IKittNullProcess(self) #continue to work for any other refs
         return self._process
 
     @staticmethod
@@ -645,7 +647,7 @@ class AdaptToProcess(object):
             try: self.process = ProcessSnapshot(original.pid)
             except InvalidProcess: pass #raise all others
         else:
-            self.process = RemoteProcess(ai.pid)
+            self.process = RemoteProcess(original.pid)
         #make an attempt to update the original caller
         if hasattr(original, 'pid'):
             try: original.pid = self.process.pid
