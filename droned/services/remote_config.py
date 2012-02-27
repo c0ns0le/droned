@@ -75,7 +75,8 @@ class _ConfigResource(Resource):
     """Resource to provide serializers and convenient child resource lookup"""
     def __init__(self):
         Resource.__init__(self)
-        OUTPUT_DATA = None
+        if not hasattr(self, 'OUTPUT_DATA'):
+            OUTPUT_DATA = None
 
     def json_serialize(self, data):
         """Take a python object and return the json serialized representation.
@@ -121,50 +122,36 @@ class _ConfigResource(Resource):
 class ConfigResouce(_ConfigResource):
     """HTTP Resource /remote_config"""
     isLeaf = False
+    OUTPUT_DATA = property(lambda s: {'URL_HANDLERS': s.children.keys()})
+
     def __init__(self):
         _ConfigResource.__init__(self)
         self.putChild('environment', EnvironmentResource())
         self.putChild('server', ServerResource())
-
-    def render_GET(self, request):
-        self.OUTPUT_DATA = {
-            'URL_HANDLERS': self.children.keys()
-        }
-        return _ConfigResource.render_GET(self, request)
 
 
 class EnvironmentResource(_ConfigResource):
     """HTTP Resource /remote_config/environment"""
     isLeaf = False
     environments = [ i.get('NAME').VALUE for i in romeo.listEnvironments() ]
+    OUTPUT_DATA = property(lambda s: {'ENVIRONMENTS': s.environments})
 
     def getChild(self, name, request):
         if name in self.environments:
             return RomeoResource(name, romeo.getEnvironment(name))
         return _ConfigResource.getChild(self, name, request)
 
-    def render_GET(self, request):
-        self.OUTPUT_DATA = {
-            'ENVIRONMENTS': self.environments
-        }
-        return _ConfigResource.render_GET(self, request)
-
 
 class ServerResource(_ConfigResource):
     """HTTP Resource /remote_config/server"""
     isLeaf = False
     servers = [ i.VALUE for i in romeo.grammars.search('select HOSTNAME') ]
+    OUTPUT_DATA = property(lambda s: {'SERVERS': s.servers})
 
     def getChild(self, name, request):
         if name in self.servers:
             return RomeoResource(name, romeo.whoami(name))
         return _ConfigResource.getChild(self, name, request)
-
-    def render_GET(self, request):
-        self.OUTPUT_DATA = {
-            'SERVERS': self.servers
-        }
-        return _ConfigResource.render_GET(self, request)
 
 
 nodata = object()
@@ -197,7 +184,8 @@ class RomeoResource(_ConfigResource):
             self.data = data
         return self
 
-    def render_GET(self, request):
+    @property
+    def OUTPUT_DATA(self):
         """format the entity data for display"""
         if self.data is nodata:
             self.data = self.entity
@@ -205,8 +193,8 @@ class RomeoResource(_ConfigResource):
             self.data = [ make_dict(d) for d in self.data ]
         else:
             self.data = make_dict(self.data)
-        self.OUTPUT_DATA = self.data
-        return _ConfigResource.render_GET(self, request)
+        return self.data
+
 
 ###############################################################################
 # Glue code to get our resource hooked into the server
