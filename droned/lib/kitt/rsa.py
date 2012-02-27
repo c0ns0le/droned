@@ -51,6 +51,10 @@ libcrypto.EVP_PKEY_get1_RSA.restype = c_void_p
 libcrypto.EVP_PKEY_free.argtypes = [c_void_p]
 libcrypto.EVP_PKEY_free.restype = c_void_p
 
+#for evp memory management
+libcrypto.RSA_up_ref.argstime = [c_void_p]
+libcrypto.RSA_up_ref.restype = c_int
+
 # <openssl/rsa.h>
 PADDING = 1 #value of RSA_PKCS1_PADDING on my system
 
@@ -64,12 +68,13 @@ libcrypto.RSA_size.argtypes = [c_void_p]
 libcrypto.RSA_size.restype = c_int
 
 
-class PrivateKey:
+class PrivateKey(object):
   def __init__(self, path):
     self.path = path
     self.id = os.path.basename(path).split('.',1)[0]
     fp = libc.fopen(path, "r")
-    assert fp, "Cannot open file %s" % path
+    if not fp:
+      raise AssertionError("Cannot open file %s" % path)
     rsa_key = libcrypto.PEM_read_RSAPrivateKey(fp, None, None, None)
     libc.fclose(fp)
     if libcrypto.ERR_peek_error() != 0 or not rsa_key:
@@ -86,12 +91,13 @@ class PrivateKey:
     return _process(text, libcrypto.RSA_private_decrypt, self.key)
 
 
-class PublicKey:
+class PublicKey(object):
   def __init__(self, path):
     self.path = path
     self.id = os.path.basename(path)
     fp = libc.fopen(path, "r")
-    assert fp, "Cannot open file %s" % path
+    if not fp:
+      raise AssertionError("Cannot open file %s" % path)
     evp = libcrypto.PEM_read_PUBKEY(fp, None, None, None)
     libc.fclose(fp)
     if libcrypto.ERR_peek_error() != 0 or not evp:
@@ -104,25 +110,13 @@ class PublicKey:
     if libcrypto.ERR_peek_error() != 0 or not rsa_key:
       libcrypto.ERR_clear_error()
       libcrypto.EVP_PKEY_free(evp)
-      #if rsa_key:
-      #  libcrypto.RSA_free(rsa_key)
       raise Exception("Failed to extract RSA key from the EVP_PKEY at %s" % path)
 
-    self.evp = evp
-    self.key = rsa_key
+    #for proper memory management 
+    libcrypto.RSA_up_ref(rsa_key) 
+    libcrypto.EVP_PKEY_free(evp)
 
-    #FIXME
-    # We are supposed to copy the RSA key out of our EVP structure
-    # so we can properly manage memory. However this code crashes
-    # indeterminently on some versions of libcrypto on 64-bit boxes.
-    # I'm not paid to debug C code so I'm just gonna skip this step
-    # to avoid the crashing at the cost of leaking about 100 bytes of
-    # memory every time a PublicKey object is created. Boo hoo.
-    #size = 88 # can't do libcrypto.RSA_size(rsa_key) because RSA_size != sizeof(RSA)
-    #rsa_key2 = libc.malloc(size)
-    #libc.memcpy(rsa_key2, rsa_key, size)
-    #libcrypto.EVP_PKEY_free(evp)
-    #self.key = rsa_key2
+    self.key = rsa_key
 
   def encrypt(self, text):
     return _process(text, libcrypto.RSA_public_encrypt, self.key)
@@ -136,7 +130,8 @@ def _process(source, func, key):
   dest = ""
   dest_buf_size = libcrypto.RSA_size(key)
   dest_buf = libc.malloc( dest_buf_size )
-  assert dest_buf, "Failed to malloc. Damn."
+  if not dest_buf:
+    raise AssertionError("Failed to malloc. Damn.")
   while source:
     read_len = min( len(source), dest_buf_size )
     i = func(read_len, source, dest_buf, key, PADDING)
