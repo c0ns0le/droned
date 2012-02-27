@@ -69,6 +69,7 @@ setup(
         'romeo.rules',
         'romeo.grammars',
         'romeo.directives',
+        'romeo.decryption',
     ],
     package_dir={'': 'lib'},
     scripts=glob('bin/*'),
