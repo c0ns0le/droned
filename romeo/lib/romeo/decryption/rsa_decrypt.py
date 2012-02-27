@@ -58,6 +58,10 @@ libcrypto.EVP_PKEY_get1_RSA.restype = c_void_p
 libcrypto.EVP_PKEY_free.argtypes = [c_void_p]
 libcrypto.EVP_PKEY_free.restype = c_void_p
 
+#for evp memory management
+libcrypto.RSA_up_ref.argstime = [c_void_p]
+libcrypto.RSA_up_ref.restype = c_int
+
 # <openssl/rsa.h>
 PADDING = 1 #value of RSA_PKCS1_PADDING on my system
 
@@ -94,22 +98,15 @@ class _PublicKey(object):
             #  libcrypto.RSA_free(rsa_key)
             raise Exception("Failed to extract RSA key from the EVP_PKEY at %s" % path)
 
-        self.evp = evp
+        #for proper memory management 
+        libcrypto.RSA_up_ref(rsa_key)
+        libcrypto.EVP_PKEY_free(evp)
+
         self.key = rsa_key
-#FIXME does not work
-#        size = 88 # can't do libcrypto.RSA_size(rsa_key) because RSA_size != sizeof(RSA)
-#        rsa_key2 = libc.malloc(size)
-#        libc.memcpy(rsa_key2, rsa_key, size)
-#        libcrypto.EVP_PKEY_free(evp)
-#        self.key = rsa_key2
 
     def decrypt(self, text):
         """decrypt the rsa text field"""
         return _process(text, libcrypto.RSA_public_decrypt, self.key)
-
-#minimize the memory leak in the public key object
-from romeo.entity import ParameterizedSingleton
-_PublicKey = ParameterizedSingleton('_PublicKey', (_PublicKey,), {})
 
 #The real magic happens here
 def _process(source, func, key):
