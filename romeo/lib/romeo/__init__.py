@@ -25,6 +25,11 @@ import sys as _sys
 import os as _os
 import re as _re
 
+try:
+    from yaml import CLoader as _Loader
+except ImportError:
+    from yaml import Loader as _Loader
+
 #don't be evil by overriding this
 try:
     MYHOSTNAME = _socket.getfqdn()
@@ -80,7 +85,7 @@ def reload(datadir=None):
             fd = open(f, 'r')
             outstr = pp.pre_process(fd,f)
             fd.close()
-            rd = _copy.deepcopy(_yaml.load(outstr))
+            rd = _copy.deepcopy(_yaml.load(outstr, Loader=_Loader))
             rd.append({'FILENAME': f})
             pp.post_process(rd,f)
             foundation.RomeoKeyValue('ENVIRONMENT', rd)
