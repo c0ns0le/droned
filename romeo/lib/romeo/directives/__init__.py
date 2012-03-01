@@ -81,7 +81,7 @@ class Preprocessor(entity.Entity):
            data = the string to receive any processing
            mode = specify which processor phase currently pre or post
         '''
-	td = data
+        td = data
         for d in self.directives:
             if not d.supports(mode): continue
             d.set_mode(mode)
@@ -140,7 +140,7 @@ class Preprocessor(entity.Entity):
             return self.group_states[groupID]
         else:
             self.group_states[groupID] = {}
-	    return self.group_states[groupID]
+            return self.group_states[groupID]
         
 
 
@@ -151,7 +151,8 @@ class Directive(object):
        same name can support overloading of directives or
        alternative signatures for the same logical directive 
        name.
-    '''    name = "Directive" #this does not have to be unique. be careful of collisions
+    '''
+    name = "Directive" #this does not have to be unique. be careful of collisions
     modes = ["pre","post"]
     
     def __init__(self,name,rootdir,*args,**kwargs):
