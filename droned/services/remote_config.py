@@ -18,7 +18,7 @@
 __author__ = "Justin Venus <justin.venus@orbitz.com>"
 __doc__ = """A Service to provide romeo config over droned's command port"""
 from kitt.interfaces import moduleProvides, IDroneDService
-from kitt.util import dictwrapper
+from kitt.util import dictwrapper, getException
 from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 from twisted.web.error import NoResource
@@ -47,6 +47,17 @@ try:
 except ImportError:
     from yaml import Loader, Dumper
    
+
+def resource_error(func):
+    """decorator the get child messages to indicate errors"""
+    def decorator(*args, **kwargs):
+        try: return func(*args, **kwargs)
+        except:
+            failure = Failure()
+            msg = getException(failure)
+            msg += ': ' + failure.getErrorMessage()
+            return NoResource(msg)
+    return decorator
 
 class _service(object):
     """helper to find our module so we can fire our own service events"""
@@ -108,6 +119,7 @@ class _ConfigResource(Resource):
         if r is self: return self
         return r.getChild(name, request)
 
+    @resource_error
     def render_GET(self, request):
         if 'pickle' in request.args.get('format', []):
             request.setHeader("Content-Type", "text/x-pickle.python")
@@ -169,12 +181,20 @@ class RomeoResource(_ConfigResource):
             self.data = nodata
         _ConfigResource.__init__(self)
 
+    @resource_error
     def getChild(self, name, request):
         """overrode to route us on our way"""
         if not name: return self
         #allow servers to get back to their environment for global information
         if name.upper() == 'ENVIRONMENT' and self.entity.KEY == 'SERVER':
-            return RomeoResource(name, list(self.entity.search('ENVIRONMENT'))[0])
+            env = None
+            for i in self.entity.search('ENVIRONMENT'):
+                if i.isChild(self.entity):
+                    env = i
+                    break
+            if not env:
+                raise romeo.EnvironmentalError('Serious issue for %s' % name.lower())
+            return RomeoResource(name, env)
         key = [ i for i in self.entity.keys() if i.upper() == name.upper() ]
         if not key:
             raise romeo.EnvironmentalError('no such romeo key %s' % name.lower())
