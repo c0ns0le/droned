@@ -116,7 +116,6 @@ class ObjectsDescriptor(object):
         for clsname in ownerClass._instanceMap.keys():
             val = ownerClass._instanceMap.get(clsname)
             if not val: continue
-            if not val.__class__.isValid(val): continue
             yield val
         #optimizations welcome provided it passes the unittest at the bottom
 
