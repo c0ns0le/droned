@@ -61,8 +61,13 @@ class ParameterizedSingleton(type):
                 *args,
                 **kwargs
             )
-            classObj._instanceMap[instanceID]._instanceID = instanceID
-            classObj._instanceMap[instanceID].__init__(*args, **kwargs)
+            try: #properly destroy the instance map allocation on failure
+                classObj._instanceMap[instanceID]._instanceID = instanceID
+                classObj._instanceMap[instanceID].__init__(*args, **kwargs)
+            except:
+                if instanceID in classObj._instanceMap:
+                    del classObj._instanceMap[instanceID]
+                raise #re-raise the original exception
         return classObj._instanceMap[ instanceID ]
 
     def exists(classObj, *args, **kwargs):
@@ -111,8 +116,8 @@ class ObjectsDescriptor(object):
         for clsname in ownerClass._instanceMap.keys():
             val = ownerClass._instanceMap.get(clsname)
             if not val: continue
-            if val.__class__.isValid(val):
-                yield val
+            if not val.__class__.isValid(val): continue
+            yield val
         #optimizations welcome provided it passes the unittest at the bottom
 
     def __set__(self, ownerInstance, value):
@@ -132,6 +137,7 @@ class Entity(object):
            @raise NotImplemented
            @return (str) ``encode``.dumps()
         """
+#TODO should we mark the entity invalid on failed serialization?
         state = self.__getstate__()
         state['__module__'] = self.__class__.__module__
         state['__class__'] = self.__class__.__name__
