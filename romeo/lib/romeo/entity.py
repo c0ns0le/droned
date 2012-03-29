@@ -35,6 +35,23 @@ import weakref
 
 class InValidEntity(Exception): pass
 
+def _weak_decorator(func):
+    """Provides a work around for recursive creation of entities in
+       an entities constructor. That would otherwise lead to runtime
+       exceptions.
+    """
+    def decorator(cls, *args, **kwargs):
+        result = func(cls, *args, **kwargs)
+        if isinstance(result, weakref.ref):
+            return result()
+        elif result:
+            cls._instanceMap[result._instanceID] = weakref.ref(
+                result, #making sure we clean up the map dict
+                lambda x: cls._weak_callback(result._instanceID,x)
+            )
+        return result
+    return decorator
+
 class ParameterizedSingleton(type):
     """Metaclass that makes class instances uniquely identified by constructor 
        args. Basically it is a convenient way to avoid having to lookup 
@@ -64,34 +81,42 @@ class ParameterizedSingleton(type):
             try: del classObj._instanceMap[instanceId]
             except: pass #we may be racing ``delete``
 
+    @_weak_decorator #we need this decorator for edge cases
     def __call__(classObj, *args, **kwargs):
+        """We will construct or look up an instance based on the
+           given arguments.
+
+           we return an instance of L{classObj} and track instance
+           with a weak reference so that we can manage memory. Note
+           by default objects will cache with a reference to self,
+           which will prevent gc from collecting the object. You
+           must state in the class data or instance constructor
+           that this object is ``reapable``.
+        """
         instanceID = classObj._safeID(*args, **kwargs)
-        if instanceID not in classObj._instanceMap or not \
-                classObj._instanceMap[instanceID]:
-            instance = classObj.__new__(
+        if instanceID not in classObj._instanceMap:
+            classObj._instanceMap[instanceID] = classObj.__new__(
                 classObj,
                 *args,
                 **kwargs
             )
-            #make the instance collectable if it is marked as
-            #reapable, this should help prevent mem leaks.
-            classObj._instanceMap[ instanceID ] = weakref.ref(
-                instance, #not sure if the callback is usefull
-                lambda x: classObj._weak_callback(instanceID,x)
-            )
-            #constructor gets called after we register
-            instance._instanceID = instanceID
-            try: #foreign code may blow up
-                instance.__init__(*args, **kwargs)
-            except: #avoid pollution
-                del classObj._instanceMap[ instanceID ]
-                raise #time for you to deal with the mess
-            #initially we are reapable
-            instance.__prevent_gc__ = False
-            if not getattr(instance, 'reapable', False):
+
+            classObj._instanceMap[instanceID].__prevent_gc__ = False
+            if not getattr(classObj._instanceMap[instanceID],'reapable',False):
                 #circular refence prevents gc
-                instance.__prevent_gc__ = instance
-        return classObj._instanceMap[ instanceID ]()
+                classObj._instanceMap[instanceID].__prevent_gc__ = \
+                        classObj._instanceMap[instanceID]
+
+            classObj._instanceMap[instanceID]._instanceID = instanceID
+
+            try: #properly destroy the instance map allocation on failure
+                classObj._instanceMap[instanceID].__init__(*args, **kwargs)
+            except:
+                if instanceID in classObj._instanceMap:
+                    del classObj._instanceMap[instanceID]
+                raise #re-raise the original exception
+
+        return classObj._instanceMap[instanceID]
 
     def exists(classObj, *args, **kwargs):
         """Checks to see if an instance of the class has already been created 
