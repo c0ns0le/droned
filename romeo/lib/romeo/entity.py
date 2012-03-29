@@ -73,14 +73,19 @@ class ParameterizedSingleton(type):
                 *args,
                 **kwargs
             )
-            instance._instanceID = instanceID
-            instance.__init__(*args, **kwargs)
             #make the instance collectable if it is marked as
             #reapable, this should help prevent mem leaks.
             classObj._instanceMap[ instanceID ] = weakref.ref(
                 instance, #not sure if the callback is usefull
                 lambda x: classObj._weak_callback(instanceID,x)
             )
+            #constructor gets called after we register
+            instance._instanceID = instanceID
+            try: #foreign code may blow up
+                instance.__init__(*args, **kwargs)
+            except: #avoid pollution
+                del classObj._instanceMap[ instanceID ]
+                raise #time for you to deal with the mess
             #initially we are reapable
             instance.__prevent_gc__ = False
             if not getattr(instance, 'reapable', False):
