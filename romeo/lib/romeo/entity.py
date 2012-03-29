@@ -25,19 +25,25 @@ except ImportError:
     try:
         import json
     except ImportError: pass
-#this try catch is for the unittest at the bottom
+#this try catch is for the test at the bottom
 try:
     from romeo.namespace import namespace
 except ImportError:
     namespace = {}
+
+import weakref
 
 class InValidEntity(Exception): pass
 
 class ParameterizedSingleton(type):
     """Metaclass that makes class instances uniquely identified by constructor 
        args. Basically it is a convenient way to avoid having to lookup 
-       existing instances or duplicating objects. A future enhancement might be 
-       to avoid potential memory leakage by using weak references.
+       existing instances or duplicating objects.
+
+       All instances are tracked with weak references, but cached by default.
+       If you want to enable automatic garbage collection on instances that
+       are not strongly referenced you must set a ``reapable`` attribute on 
+       your class or in your constructor to the value of logical True.
     """
     def __init__(classObj, name, bases, members):
         super(ParameterizedSingleton, classObj).__init__(name, bases, members)
@@ -53,22 +59,39 @@ class ParameterizedSingleton(type):
         except TypeError:
             return hash(_pickle.dumps(instanceID))
 
+    def _weak_callback(classObj, instanceId, obj):
+        if instanceId in classObj._instanceMap:
+            try: del classObj._instanceMap[instanceId]
+            except: pass #we may be racing ``delete``
+
     def __call__(classObj, *args, **kwargs):
         instanceID = classObj._safeID(*args, **kwargs)
-        if instanceID not in classObj._instanceMap:
-            classObj._instanceMap[instanceID] = classObj.__new__(
+        if instanceID not in classObj._instanceMap or not \
+                classObj._instanceMap[instanceID]:
+            instance = classObj.__new__(
                 classObj,
                 *args,
                 **kwargs
             )
-            try: #properly destroy the instance map allocation on failure
-                classObj._instanceMap[instanceID]._instanceID = instanceID
-                classObj._instanceMap[instanceID].__init__(*args, **kwargs)
-            except:
-                if instanceID in classObj._instanceMap:
-                    del classObj._instanceMap[instanceID]
-                raise #re-raise the original exception
-        return classObj._instanceMap[ instanceID ]
+            #make the instance collectable if it is marked as
+            #reapable, this should help prevent mem leaks.
+            classObj._instanceMap[ instanceID ] = weakref.ref(
+                instance, #not sure if the callback is usefull
+                lambda x: classObj._weak_callback(instanceID,x)
+            )
+            #constructor gets called after we register
+            instance._instanceID = instanceID
+            try: #foreign code may blow up
+                instance.__init__(*args, **kwargs)
+            except: #avoid pollution
+                del classObj._instanceMap[ instanceID ]
+                raise #time for you to deal with the mess
+            #initially we are reapable
+            instance.__prevent_gc__ = False
+            if not getattr(instance, 'reapable', False):
+                #circular refence prevents gc
+                instance.__prevent_gc__ = instance
+        return classObj._instanceMap[ instanceID ]()
 
     def exists(classObj, *args, **kwargs):
         """Checks to see if an instance of the class has already been created 
@@ -80,15 +103,21 @@ class ParameterizedSingleton(type):
     def delete(classObj, instance):
         """Deletes the stored reference to an instance of the class."""
         for instanceID, _instance in classObj._instanceMap.items():
-            if _instance is instance:
-                del classObj._instanceMap[ instanceID ]
+            if _instance() is instance:
+                #break the circular reference if it exists
+                instance.__prevent_gc__ = False
+                try: del classObj._instanceMap[ instanceID ]
+                except: pass #we may be racing the gc mechanism
                 return
 
     def isValid(classObj, instance):
         """Returns True if the given instance has not been previously deleted, 
            False otherwise
         """
-        return classObj._instanceMap.get(instance._instanceID) is instance
+        return classObj._instanceMap.get(
+            instance._instanceID,
+            lambda: None
+        )() is instance
 
     def isStandard(classObj, instance):
         """Returns True if the given instance's parameters were hashable by 
@@ -104,20 +133,22 @@ class ObjectsDescriptor(object):
        http://users.rcn.com/python/download/Descriptor.htm
     """
     def __get__(self, ownerInstance, ownerClass):
-#don't ever uncomment this        return ownerClass._instanceMap.itervalues()
          return self.__safe_itervalues__(ownerClass)
 
     def __safe_itervalues__(self, ownerClass):
         """Works around RuntimeError Exception whenever an Entity is marked
-           for deletion, yet the Entity.objects is still being interated
-           over.
+           for deletion, yet the Entity.objects is still being iterated
+           over. This is also safe in the event of automatic gc.
         """
         #sacrifices speed and simplicity for safety
         for clsname in ownerClass._instanceMap.keys():
-            val = ownerClass._instanceMap.get(clsname)
-            if not val: continue
+            #items in the instanceMap are weak references
+            val = ownerClass._instanceMap.get(
+                clsname, lambda: None
+            )() #now we have a real instance
+            if not val: continue #could have gc'd
             yield val
-        #optimizations welcome provided it passes the unittest at the bottom
+        #optimizations welcome provided it passes the test at the bottom
 
     def __set__(self, ownerInstance, value):
         raise AttributeError("Attempt to write to a read-only data descriptor")
@@ -127,6 +158,7 @@ class Entity(object):
     """Abstract base class for models"""
     COMPLEX_CONSTRUCTOR = property(lambda s: not s.__class__.isStandard(s))
     serializable = False
+    reapable = False
 
     def serialize(self, encode='pickle'):
         """This method is used only by the Journal service to persist the state
@@ -205,7 +237,6 @@ class Entity(object):
         else:
             raise InValidEntity("InValid Instance of <%s>" % (self.__class__.__name__,))
 
-
     __str__ = __repr__
 
 
@@ -222,20 +253,41 @@ if __name__ == '__main__':
         sys.stdout.write(str(obj)+'\n')
 
     class Foo(Entity):
+        """Test class to demonstrate functionality"""
+        @classmethod
+        def _weak_callback(classObj, instanceId, obj):
+            if instanceId in classObj._instanceMap:
+                del classObj._instanceMap[instanceId]
+            _print("Reaping unbound object id: %s" % str(instanceId))
+
         def __init__(self, value):
-            _print('Created Foo Entity [%d]' % (value,))
+            self.reapable = bool(value % 2) #odds will automatically reap
+            _print('Created Foo(%d)' % (value,))
+            if self.reapable:
+                _print("Foo(%d) will automatically gc when it leaves scope" % (value,))
+            else:
+                _print("Foo(%d) will not gc without an explicite delete" % (value,))
+            _print("")
 
     #instantiate some Foo Entities
-    list(map(Foo, range(10)))
+    a = list(map(Foo, range(10)))
+    _print("\nCurrent map:\n%s\n" % str(Foo._instanceMap))
+    _print("\nGo go gadget GC\n")
+    del a #once unbound automatic GC should kick in
 
+    _print("\n\nCurrent map:\n%s\n" % str(Foo._instanceMap))
     #make sure runtime errors aren't thrown when the undelying dict is modified
     for obj in Foo.objects: #this is a generator accessing the dict
+        _print("Reference Count of %s is %d" % (obj,weakref.getweakrefcount(obj)))
         _print("Preparing to delete Entity %s during Iteration" % obj)
         Foo.delete(obj) #this modifies the dict
         try:
             _print(obj) #this should throw an invalid entity error
         except InValidEntity:
             _print('Foo Entity Successfully Invalidated during Iteration')
+            _print("Reference Count is now %d" % (weakref.getweakrefcount(obj),))
         except:
             _print('Unexpected Exception, re-raising')
             raise
+        _print("")
+    _print("Current map:\n%s\n" % str(Foo._instanceMap))
