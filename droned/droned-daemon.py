@@ -435,6 +435,7 @@ class ConfigManager(Entity):
             AUTOSTART_SERVICES += ('application',)
         #primary data storage
         self.data = {
+            'reactor': drone.reactor,
             'AUTOSTART_SERVICES': AUTOSTART_SERVICES,
             'EXCESSIVE_LOGGING': drone.DEBUG,
             'ROMEO_API': romeo,
