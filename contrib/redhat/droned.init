@@ -32,8 +32,14 @@ RETVAL=0
 
 start() {
         echo -n $"Starting $prog: "
-	daemon $COMMAND $OPTIONS --pidfile=${pidfile}
+	$COMMAND $OPTIONS --pidfile=${pidfile} >&/dev/null
         RETVAL=$?
+        #should not have to do this
+        if [ $RETVAL -eq 0 ]; then
+                echo_success
+        else
+                echo_failure
+        fi
         echo
         [ $RETVAL = 0 ] && touch ${lockfile}
         return $RETVAL
@@ -43,6 +49,12 @@ stop() {
         echo -n $"Stopping $prog: "
         $COMMAND $OPTIONS --pidfile=${pidfile} --stop >&/dev/null
         RETVAL=$?
+        #should not have to do this
+        if [ $RETVAL -eq 0 ]; then
+                echo_success
+        else
+                echo_failure
+        fi
         echo
 	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
 }

@@ -23,6 +23,7 @@ from twisted.internet.defer import TimeoutError, deferredGenerator, \
 from twisted.python.failure import Failure
 from droned.entity import Entity
 from droned.logging import debug
+from droned.clients.gremlin import GremlinClient
 import config
 
 class DroneD(Entity):
@@ -98,4 +99,3 @@ class DroneD(Entity):
 # Do these last to avoid circular import dependencies
 from droned.models.server import Server
 from droned.clients.blaster import DroneBlaster
-from droned.clients.gremlin import GremlinClient

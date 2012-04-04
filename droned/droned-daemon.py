@@ -435,6 +435,7 @@ class ConfigManager(Entity):
             AUTOSTART_SERVICES += ('application',)
         #primary data storage
         self.data = {
+            'reactor': drone.reactor,
             'AUTOSTART_SERVICES': AUTOSTART_SERVICES,
             'EXCESSIVE_LOGGING': drone.DEBUG,
             'ROMEO_API': romeo,
@@ -489,6 +490,7 @@ class ConfigManager(Entity):
             yield (key,value)
 ConfigManager = ConfigManager() #hacktastic Singleton
 import config #provided by ConfigManager
+
 ###############################################################################
 # Setup basic logging working as soon as possible
 ###############################################################################
@@ -680,6 +682,10 @@ class ServiceManager(Entity):
             return object.__getattr__(self, param)
 sm = ServiceManager()
 import services #provided by ServiceManager
+#this lets you have temporary root level permision prior to your
+#service actually starting, you should check to see if your service
+#is in config.AUTOSTART_SERVICES.
+config.reactor.fireSystemEvent('droned-configured')
 
 ###############################################################################
 # Setup Log Handlers
