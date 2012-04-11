@@ -8,7 +8,7 @@
 
 Name:		droned
 Version:        0.9.0
-Release:	2%{?dist}
+Release:	3%{?dist}
 Summary:	DroneD - Application Service Framework	
 
 Group:		System Environment/Daemons
@@ -112,8 +112,6 @@ egrep -v '*.pyo|*.pyc' %{name}/INSTALLED_FILES.orig | \
 #install redhat systemd units
 %{__install} -D contrib/redhat/%{name}.service \
 	$RPM_BUILD_ROOT/lib/systemd/system/%{name}.service
-%{__install} -D contrib/redhat/%{name}.target \
-	$RPM_BUILD_ROOT/lib/systemd/system/%{name}.target
 %else
 #install redhat SysV init settings
 %{__install} -D contrib/redhat/%{name}.init \
@@ -184,11 +182,9 @@ else
 fi
 %if %{systemd}
 # units by default
-/bin/systemctl is-active %{name}.service >/dev/null 2>&1 || :
-if [ $1 -eq 0 ];then
-    /bin/systemctl try-restart %{name}.service >/dev/null 2>&1 || :
-else
-    /bin/systemctl enable %{name}.service >/dev/null 2>&1 || :
+if [ $1 -eq 1 ] ; then
+    # Initial installation
+    /bin/systemctl daemon-reload >/dev/null 2>&1 || :
 fi
 %else
 /sbin/chkconfig --add %{name} >&/dev/null || :
@@ -196,28 +192,24 @@ fi
 
 
 %preun
-#echo "running preun"
+if [ $1 -eq 0 ] ; then
 %if %{systemd}
-# On uninstall (not upgrade), disable and stop the units
-/bin/systemctl --no-reload disable %{name}.service >/dev/null 2>&1 || :
-/bin/systemctl stop %{name}.service >/dev/null 2>&1 || :
+    # Package removal, not upgrade
+    /bin/systemctl --no-reload disable %{name}.service > /dev/null 2>&1 || :
+    /bin/systemctl stop %{name}.service > /dev/null 2>&1 || :
 %else
-# On uninstall (not upgrade), disable and stop the init scripts
-/sbin/service %{name} stop >/dev/null 2>&1 || :
-/sbin/chkconfig %{name} off >&/dev/null || :
-/sbin/chkconfig --del %{name} >&/dev/null || :
-%endif
-
+    /sbin/service %{name} stop >/dev/null 2>&1 || :
+    /sbin/chkconfig %{name} off >&/dev/null || :
+    /sbin/chkconfig --del %{name} >&/dev/null || :  
+%endif  
+fi
 
 %postun
-#echo "running postun"
 %if %{systemd}
-# Reload init system configuration, to make systemd honour changed
-# or deleted unit files
 /bin/systemctl daemon-reload >/dev/null 2>&1 || :
 if [ $1 -ge 1 ] ; then
-        # On upgrade (not uninstall), optionally, restart the daemon
-        /bin/systemctl try-restart %{name}.service >/dev/null 2>&1 || :
+    # Package upgrade, not uninstall
+    /bin/systemctl try-restart %{name}.service >/dev/null 2>&1 || :
 fi
 %endif
 
@@ -226,16 +218,17 @@ fi
 %defattr(-,root,root,-)
 %doc LICENSE README NEWS
 %dir %attr(755, root, root) %{_sysconfdir}/%{name}
-%config(noreplace) %attr(600,root,root) %{_sysconfdir}/%{name}/%{name}.conf
+%config(noreplace) %attr(644,root,root) %{_sysconfdir}/%{name}/%{name}.conf
 %if %{systemd}
 %config(noreplace) %attr(644,root,root) /lib/systemd/system/%{name}.service
-%config(noreplace) %attr(644,root,root) /lib/systemd/system/%{name}.target
 %else
 %attr(755,root,root) %{_sysconfdir}/init.d/%{name}
 %config(noreplace) %attr(644,root,root) %{_sysconfdir}/sysconfig/%{name}
 %endif
 %dir /var/log/%{name}
 %dir %{_sysconfdir}/pki/%{name}
+%ghost %attr(600,root,root) %{_sysconfdir}/pki/%{name}/local.private
+%ghost %attr(644,root,root) %{_sysconfdir}/pki/%{name}/local.public
 %dir %{_datadir}/%{name}
 %dir /var/lib/%{name}
 
@@ -262,6 +255,9 @@ fi
 
 
 %changelog
+* Wed Apr 11 2012 Justin Venus <justin.venus@orbitz.com> 0.9.0-3
+- cleaning up the specfile - jciesla
+
 * Wed Jan 25 2012 Justin Venus <justin.venus@orbitz.com> 0.9.0-1
 - getting ready to release open source.
 - previous rpm changelog history has been removed to protect the innocent.
