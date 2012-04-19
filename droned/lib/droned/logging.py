@@ -15,10 +15,70 @@
 ###############################################################################
 
 """This module implements DroneD's logging facilities."""
-import sys, os, time
+import sys, os, time, glob
 from twisted.python.failure import Failure
 from twisted.python.log import FileLogObserver, StdioOnnaStick
 from twisted.python.logfile import DailyLogFile
+
+class DailyPurgingLogFile(DailyLogFile):
+    """A log file that is rotated daily (at or after midnight localtime).
+
+       A maxRotatedFiles of None disables purging.
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        Create a log file rotating on length.
+
+        @param name: file name.
+        @type name: C{str}
+        @param directory: path of the log file.
+        @type directory: C{str}
+        @param defaultMode: mode used to create the file.
+        @type defaultMode: C{int}
+        @param maxRotatedFiles: if not None, max number of log files the class
+            creates. Warning: it removes all log files above this number.
+        @type maxRotatedFiles: C{int}
+        """
+        self.maxRotatedFiles = kwargs.pop('maxRotatedFiles', None)
+        DailyLogFile.__init__(self, *args, **kwargs)
+        self._logger = logWithContext(type='console')
+
+    def notification(self, message):
+        """
+        only used when logs are deleted
+        """
+        self._logger(message)
+
+    def listLogs(self):
+        """
+        Return sorted list of integers - the old logs' identifiers.
+        """
+        result = glob.glob("%s.*" % self.path)
+        result.sort()
+        return result
+
+    def rotate(self):
+        """
+        Rotate the file and create a new one.
+
+        If it's not possible to open new logfile, this will fail silently,
+        and continue logging to old logfile.
+
+        Old log files will be automatically purged.
+        """
+        #daily rotation first
+        DailyLogFile.rotate(self)
+        if not self.maxRotatedFiles:
+            return
+        if not (os.access(self.directory, os.W_OK) and os.access(self.path, os.W_OK)):
+            return
+        logs = self.listLogs()
+        while len(logs) >= self.maxRotatedFiles:
+            l = logs.pop(0)
+            #this should never match, but just make sure
+            if l.endswith('log'): continue
+            self.notification('deleting %s' % l)
+            os.remove(l)
 
 
 class MyLogObserver(FileLogObserver):
@@ -52,9 +112,15 @@ def logToDir(directory='logs', LOG_TYPE=('console',), OBSERVER=MyLogObserver):
     """Call this to write logs to the specified directory,
        optionally override the FileLogObserver.
     """
+    args = ()
+    kwargs = {'maxRotatedFiles': 7} #seven days of logs by default
+    try: import config #fix for early logging
+    except: config = None #also works around daemon wrappers
+    if config and config.RETAINED_LOGS:
+        kwargs.update({'maxRotatedFiles': config.RETAINED_LOGS})
     for name in LOG_TYPE:
         path = os.path.join(directory, name + '.log')
-        logfile = DailyLogFile.fromFullPath(path)
+        logfile = DailyPurgingLogFile.fromFullPath(path, *args, **kwargs)
         logs[name] = OBSERVER(logfile)
 
 
