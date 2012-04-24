@@ -8,7 +8,7 @@
 
 Name:		droned
 Version:        0.9.0
-Release:	3%{?dist}
+Release:	4%{?dist}
 Summary:	DroneD - Application Service Framework	
 
 Group:		System Environment/Daemons
