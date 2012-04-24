@@ -60,6 +60,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
         self.deferredResult = args[-1] #deferred result is always the last arg
         self.debug = False
 
+        self._pid = 0
         #capture application output as it would appear on a terminal
         self.OUTPUT = ''
         #capture STDERR
@@ -88,6 +89,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
     def connectionMade(self):
         """Process is running, we close STDIN by default"""
         self.transport.closeStdin() # close stdin
+        self._pid = self.transport.pid
 
 
     def outReceived(self, data):
@@ -116,7 +118,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
 
     def outConnectionLost(self):
         """outConnectionLost! The child closed their stdout!"""
-        pass 
+        pass
 
 
     def errConnectionLost(self):
@@ -129,8 +131,13 @@ class ApplicationProtocol(protocol.ProcessProtocol):
            in your own protocol imlementation to inorder to inject your application
            process identification.
         """
+        if self._pid:
+            import os #work around for randomly missing sigchild
+            try: os.waitpid(self._pid, os.WNOHANG)
+            except: pass
         if not self.deferredResult.called:
             #give the caller some context to work with
+            self.logger("Application has finished")
             result = {
                 'description': 'Application Exited',
                 'code': reason.value.exitCode,
@@ -144,10 +151,10 @@ class ApplicationProtocol(protocol.ProcessProtocol):
                 self.deferredResult.callback(result)
             else:
                 result['description'] = reason.getErrorMessage()
-                result['error'] = reason
+                result['error'] = True
+                result['stacktrace'] = reason.getTraceback()
                 self.deferredResult.errback(DroneCommandFailed(result))
 
-        #should not get here
         return
 
 
