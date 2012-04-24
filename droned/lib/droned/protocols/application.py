@@ -118,12 +118,13 @@ class ApplicationProtocol(protocol.ProcessProtocol):
 
     def outConnectionLost(self):
         """outConnectionLost! The child closed their stdout!"""
-        pass
+        self.logger('stdout closed by process %d' % self._pid)
+        
 
 
     def errConnectionLost(self):
         """errConnectionLost! The child closed their stderr."""
-        pass
+        self.logger('stderr closed by process %d' % self._pid)
 
 
     def runAppCallbacks(self, reason):
@@ -137,7 +138,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
             except: pass
         if not self.deferredResult.called:
             #give the caller some context to work with
-            self.logger("Application has finished")
+            self.logger("Process %d is no longer running" % self._pid)
             result = {
                 'description': 'Application Exited',
                 'code': reason.value.exitCode,
