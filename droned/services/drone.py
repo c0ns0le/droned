@@ -92,18 +92,18 @@ class Gremlin(resource.Resource):
 
     def render_GET(self, request):
         Type = "application/x-pickle.python"
-        def _render(result):
-            request.setHeader("Content-Type", Type)
-            request.setHeader("Content-Length", str(len(result)))
-            request.setHeader("Pragma", "no-cache")
-            request.setHeader("Cache-Control", "no-cache")
-            request.write(result)
-            request.finish()
+        def _render(result, r):
+            if r.finished: return
+            r.setHeader("Content-Type", Type)
+            r.setHeader("Content-Length", str(len(result)))
+            r.setHeader("Pragma", "no-cache")
+            r.setHeader("Cache-Control", "no-cache")
+            r.write(result)
+            r.finish()
 
         d = self._serialize_objects(request)
-        d.addCallback(_render)
+        d.addCallback(_render, request)
         d.addErrback(lambda x: gremlin_log(x.getTraceback()) and x or x)
-        request.notifyFinish().addErrback(lambda x: cancelTask(d))
         return server.NOT_DONE_YET
         
 
@@ -114,13 +114,14 @@ class Prime(resource.Resource):
 
 
     def render_GET(self, request):
-        def _render(result):
-            request.setHeader("Content-Type", "text/plain")
-            request.setHeader("Content-Length", str(len(result)))
-            request.setHeader("Pragma", "no-cache")
-            request.setHeader("Cache-Control", "no-cache")
-            request.write(result)
-            request.finish()
+        def _render(result, r):
+            if not r.finished:
+                r.setHeader("Content-Type", "text/plain")
+                r.setHeader("Content-Length", str(len(result)))
+                r.setHeader("Pragma", "no-cache")
+                r.setHeader("Cache-Control", "no-cache")
+                r.write(result)
+                r.finish()
             #invalidate the prime after a certain period of time
             try:
                 config.reactor.callLater(
@@ -132,8 +133,7 @@ class Prime(resource.Resource):
 
         d = drone.getprime()
         d.addCallback(str) #getprime returns an int
-        d.addCallback(_render)
-        request.notifyFinish().addErrback(lambda x: cancelTask(d))
+        d.addCallback(_render, request)
         return server.NOT_DONE_YET
 
 
@@ -231,23 +231,23 @@ class Control(resource.Resource):
 
 
     def render_POST(self, request):
-        def _render(result, deferred):
-            if not request.channel.connected:
+        def _render(result, r):
+            if r.finished:
                 server_log("Client disconnected")
-                request.channel.connectionLost(None)
+                r.channel.connectionLost(None)
                 return
             data = result.get('response', 'ok')
-            request.setHeader("content-type", result.get('type','text/plain'))
-            request.setHeader("Pragma", "no-cache")
-            request.setHeader("Cache-Control", "no-cache")
-            request.setHeader("content-length", str( len( data ) ))
-            request.setResponseCode(result.get('code', 200))
-            request.write( str(data) )
-            request.finish()
+            r.setHeader("content-type", result.get('type','text/plain'))
+            r.setHeader("Pragma", "no-cache")
+            r.setHeader("Cache-Control", "no-cache")
+            r.setHeader("content-length", str( len( data ) ))
+            r.setResponseCode(result.get('code', 200))
+            r.write( str(data) )
+            r.finish()
 
         d = self.execute(request)
         d.addBoth(self.msgBufResponse)
-        d.addCallback(_render, d)
+        d.addCallback(_render, request)
         
         return server.NOT_DONE_YET
 
