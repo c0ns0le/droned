@@ -231,7 +231,11 @@ class Control(resource.Resource):
 
 
     def render_POST(self, request):
-        def _render(result):
+        def _render(result, deferred):
+            if not request.channel.connected:
+                server_log("Client disconnected")
+                request.channel.connectionLost(None)
+                return
             data = result.get('response', 'ok')
             request.setHeader("content-type", result.get('type','text/plain'))
             request.setHeader("Pragma", "no-cache")
@@ -243,8 +247,8 @@ class Control(resource.Resource):
 
         d = self.execute(request)
         d.addBoth(self.msgBufResponse)
-        d.addCallback(_render)
-        request.notifyFinish().addErrback(lambda x: cancelTask(d))
+        d.addCallback(_render, d)
+        
         return server.NOT_DONE_YET
 
 
@@ -270,49 +274,6 @@ class DroneSite(server.Site):
        http_log(line)
 
 
-class HealthCheckServer(internet.TCPServer):
-    deferred = defer.succeed(None)
-
-    def __init__(self, *args, **kwargs):
-        internet.TCPServer.__init__(self, *args, **kwargs)
-        self._task = task.LoopingCall(self._health)
-
-    def _restart(self, failure):
-        d = self.stopService()
-        d.addCallback(lambda x: self.startService())
-        return d 
-
-    def _health(self):
-        if self.deferred.called:
-            http_log('health check ping')
-            self.deferred = blast('ping', ['127.0.0.1'], 
-                config.DRONED_MASTER_KEY, timeout=5.0)
-            self.deferred.addErrback(self._restart)
-
-    def startService(self):
-        if not self._task.running:
-            config.reactor.callLater(60, self._task.start, 60)
-        return internet.TCPServer.startService(self)
-
-    @defer.deferredGenerator
-    def stopService(self):
-        result = None
-        if self._task.running:
-            self._task.stop()
-        if not self.deferred.called:
-            wfd = defer.waitForDeferred(self.deferred)
-            yield wfd
-            wfd.getResult()
-        d = defer.maybeDeferred(internet.TCPServer.stopService, self)
-        wfd = defer.waitForDeferred(d)
-        yield wfd
-        try:
-            result = wfd.getResult()
-        except:
-            result = Failure()
-        yield result
-
-
 ###############################################################################
 # Service API Requirements
 ###############################################################################
@@ -336,7 +297,7 @@ def start():
         dr.putChild('gremlin', Gremlin())
 
         site = DroneSite(dr, **kwargs)
-        service = HealthCheckServer(config.DRONED_PORT, site) 
+        service = internet.TCPServer(config.DRONED_PORT, site) 
         service.setName(SERVICENAME)
         service.setServiceParent(parentService)
 
