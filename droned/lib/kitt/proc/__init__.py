@@ -376,10 +376,15 @@ class _Cache(type):
 LiveProcess = _Cache('LiveProcess', (LiveProcess,), {})
 #ProcessSnapshot = _Cache('ProcessSnapshot', (ProcessSnapshot,), {})
 
-from kitt.decorators import deferredAsThread
-from twisted.internet import defer
+from kitt.decorators import deferredAsThread, synchronizedDeferred
+from twisted.internet import defer, task
 from twisted.python.failure import Failure
 import time
+
+#limit the number of process looks to the cpu count
+semaphore = defer.DeferredSemaphore(CPU_COUNT)
+process_poll = 10
+
 class ProcessSnapshot(object):
     """Snapshot of process information"""
     implements(IKittProcessSnapshot)
@@ -398,17 +403,27 @@ class ProcessSnapshot(object):
     uid = property(lambda s: s.info.get('uid', 0))
     gid = property(lambda s: s.info.get('gid', 0))
 
+    def __del__(self):
+        if self._task.running:
+            self._task.stop()
+
     def __init__(self, pid):
         self.deferred = defer.succeed(None)
         self._lastupdate = 0
         self._pid = pid
         self._data = {}
+        self._deferred = defer.succeed(None)
+        self._task = task.LoopingCall(self._poll)
         try:
             LiveProcess(pid) #warm the cache
-            d = self.update() #get status and handle failures
-            d.addErrback(lambda x: self.__class__.delete(self))
+            self._task.start(process_poll)
         except InvalidProcess:
             self.__class__.delete(self)
+
+    def _poll(self):
+        if self.deferred.called:
+            self.deferred = self.update()
+            self.deferred.addErrback(lambda x: None)
 
     def isRunning(self):
         try: return LiveProcess(self.pid).running
@@ -417,15 +432,12 @@ class ProcessSnapshot(object):
             self._data = {}
             return False
 
+    @synchronizedDeferred(semaphore)
     @defer.deferredGenerator
     def update(self):
         result = {}
         try:
-            if not self.deferred.called:
-                wfd = defer.waitForDeferred(self.deferred)
-                yield wfd
-                result = wfd.getResult()
-            elif (time.time() - self._lastupdate) < 10:
+            if (time.time() - self._lastupdate) < process_poll * 2:
                 result = self._data #throttle scans
             else:
                 self._lastupdate = time.time()
@@ -435,6 +447,8 @@ class ProcessSnapshot(object):
                 self._data.update(wfd.getResult())
                 result = self._data
         except:
+            if self._task.running:
+                self._task.stop()
             self.__class__.delete(self)
             self._data = {} #destroy stats on death
             result = Failure()

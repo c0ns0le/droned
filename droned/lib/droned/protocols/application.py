@@ -88,8 +88,10 @@ class ApplicationProtocol(protocol.ProcessProtocol):
 
     def connectionMade(self):
         """Process is running, we close STDIN by default"""
-        self.transport.closeStdin() # close stdin
         self._pid = self.transport.pid
+        if self._pid:
+            self.logger("Process has pid %d" % self._pid)
+        self.transport.closeStdin() # close stdin
 
 
     def outReceived(self, data):
@@ -113,7 +115,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
 
     def inConnectionLost(self):
         """inConnectionLost! stdin is closed! (we probably did it)"""
-        pass
+        self.logger('stdin closed by process %d' % self._pid)
 
 
     def outConnectionLost(self):
