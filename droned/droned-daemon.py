@@ -330,6 +330,7 @@ class Daemon(Options):
         if self.DEBUG: return
         for signum, signame in self.SIGNALS.items():
             if signame in ('SIGKILL',): continue
+            if signame in ('SIGCHLD',): continue
             try: signal.signal(signum, self.signal_emitter)
             except RuntimeError: pass #tried to set an invalid signal
         #prevent this from being called again
