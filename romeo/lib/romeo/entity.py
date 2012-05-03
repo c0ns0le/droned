@@ -128,7 +128,9 @@ class ParameterizedSingleton(type):
     def delete(classObj, instance):
         """Deletes the stored reference to an instance of the class."""
         for instanceID, _instance in classObj._instanceMap.items():
-            if _instance() is instance:
+            if isinstance(_instance, weakref.ref):
+                _instance = _instance()
+            if _instance is instance:
                 #break the circular reference if it exists
                 instance.__prevent_gc__ = False
                 try: del classObj._instanceMap[ instanceID ]

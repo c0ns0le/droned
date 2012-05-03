@@ -71,6 +71,7 @@ class Daemon(Options):
             "Location to write system history"],
         ["logdir","",os.path.join(os.path.sep,'var','log','droned'),
             "Location to write system logs"],
+        ["logretention","", 7, "Maximum number of days to retain logs", int],
         ["homedir","",os.path.join(os.path.sep,'var','lib','droned','home'),
             "Location to use as a home directory"],
         ["config","", None, "Use configuration from file, overrides commandline"],
@@ -78,7 +79,7 @@ class Daemon(Options):
             "Location to use as a webroot directory"],
         ["debug", "", False, "Don't install signal handlers and turn on debuggging", bool],
         ["hostdb","",os.path.join(os.path.sep,'etc','hostdb'), 
-            "The directory to providing ROMEO configuration."],
+            "The directory providing ROMEO configuration."],
         ["rsadir","",os.path.join(os.path.sep,'etc','pki','droned'), 
             "The directory to providing RSA keys."],
         ["privatekey","","local", "Name of the Server Private RSA key."],
@@ -96,6 +97,7 @@ class Daemon(Options):
     SIGNALS = dict((k, v) for v, k in signal.__dict__.iteritems() if \
             v.startswith('SIG') and not v.startswith('SIG_'))
 
+    RETAINED_LOG_COUNT = property(lambda s: s['logretention'])
     MAX_CONCURRENCY = property(lambda s: s['concurrency'])
     PRIMES_FILE = property(lambda s: s['primefile'])
     RSA_DIR = property(lambda s: s['rsadir'])
@@ -328,6 +330,7 @@ class Daemon(Options):
         if self.DEBUG: return
         for signum, signame in self.SIGNALS.items():
             if signame in ('SIGKILL',): continue
+            if signame in ('SIGCHLD',): continue
             try: signal.signal(signum, self.signal_emitter)
             except RuntimeError: pass #tried to set an invalid signal
         #prevent this from being called again
@@ -435,8 +438,10 @@ class ConfigManager(Entity):
             AUTOSTART_SERVICES += ('application',)
         #primary data storage
         self.data = {
+            'reactor': drone.reactor,
             'AUTOSTART_SERVICES': AUTOSTART_SERVICES,
             'EXCESSIVE_LOGGING': drone.DEBUG,
+            'RETAINED_LOGS': drone.RETAINED_LOG_COUNT,
             'ROMEO_API': romeo,
             'ROMEO_HOST_OBJECT': me,
             'ROMEO_ENV_NAME': ENV_NAME,
@@ -489,6 +494,7 @@ class ConfigManager(Entity):
             yield (key,value)
 ConfigManager = ConfigManager() #hacktastic Singleton
 import config #provided by ConfigManager
+
 ###############################################################################
 # Setup basic logging working as soon as possible
 ###############################################################################
@@ -680,6 +686,10 @@ class ServiceManager(Entity):
             return object.__getattr__(self, param)
 sm = ServiceManager()
 import services #provided by ServiceManager
+#this lets you have temporary root level permision prior to your
+#service actually starting, you should check to see if your service
+#is in config.AUTOSTART_SERVICES.
+config.reactor.fireSystemEvent('droned-configured')
 
 ###############################################################################
 # Setup Log Handlers

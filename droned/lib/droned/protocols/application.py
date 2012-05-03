@@ -60,6 +60,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
         self.deferredResult = args[-1] #deferred result is always the last arg
         self.debug = False
 
+        self._pid = 0
         #capture application output as it would appear on a terminal
         self.OUTPUT = ''
         #capture STDERR
@@ -87,6 +88,9 @@ class ApplicationProtocol(protocol.ProcessProtocol):
 
     def connectionMade(self):
         """Process is running, we close STDIN by default"""
+        self._pid = self.transport.pid
+        if self._pid:
+            self.logger("Process has pid %d" % self._pid)
         self.transport.closeStdin() # close stdin
 
 
@@ -111,17 +115,18 @@ class ApplicationProtocol(protocol.ProcessProtocol):
 
     def inConnectionLost(self):
         """inConnectionLost! stdin is closed! (we probably did it)"""
-        pass
+        self.logger('stdin closed by process %d' % self._pid)
 
 
     def outConnectionLost(self):
         """outConnectionLost! The child closed their stdout!"""
-        pass 
+        self.logger('stdout closed by process %d' % self._pid)
+        
 
 
     def errConnectionLost(self):
         """errConnectionLost! The child closed their stderr."""
-        pass
+        self.logger('stderr closed by process %d' % self._pid)
 
 
     def runAppCallbacks(self, reason):
@@ -129,8 +134,13 @@ class ApplicationProtocol(protocol.ProcessProtocol):
            in your own protocol imlementation to inorder to inject your application
            process identification.
         """
+        if self._pid:
+            import os #work around for randomly missing sigchild
+            try: os.waitpid(self._pid, os.WNOHANG)
+            except: pass
         if not self.deferredResult.called:
             #give the caller some context to work with
+            self.logger("Process %d is no longer running" % self._pid)
             result = {
                 'description': 'Application Exited',
                 'code': reason.value.exitCode,
@@ -144,10 +154,10 @@ class ApplicationProtocol(protocol.ProcessProtocol):
                 self.deferredResult.callback(result)
             else:
                 result['description'] = reason.getErrorMessage()
-                result['error'] = reason
+                result['error'] = True
+                result['stacktrace'] = reason.getTraceback()
                 self.deferredResult.errback(DroneCommandFailed(result))
 
-        #should not get here
         return
 
 
