@@ -44,12 +44,17 @@ def _weak_decorator(func):
         result = func(cls, *args, **kwargs)
         if isinstance(result, weakref.ref):
             return result()
-        elif result:
-            cls._instanceMap[result._instanceID] = weakref.ref(
-                result, #making sure we clean up the map dict
-                lambda x: cls._weak_callback(result._instanceID,x)
-            )
-        return result
+        elif not result:
+            return result
+        instanceID = result._instanceID
+        if not getattr(result, 'reapable', False):
+            #circular reference prevents gc
+            setattr(result, '__prevent_gc__', result)
+        cls._instanceMap[instanceID] = weakref.ref(
+            result, #making sure we clean up the map dict
+            lambda x: cls._weak_callback(instanceID,x)
+        )
+        return cls._instanceMap[result._instanceID]()
     return decorator
 
 class ParameterizedSingleton(type):
@@ -102,11 +107,6 @@ class ParameterizedSingleton(type):
             )
 
             classObj._instanceMap[instanceID].__prevent_gc__ = False
-            if not getattr(classObj._instanceMap[instanceID],'reapable',False):
-                #circular refence prevents gc
-                classObj._instanceMap[instanceID].__prevent_gc__ = \
-                        classObj._instanceMap[instanceID]
-
             classObj._instanceMap[instanceID]._instanceID = instanceID
 
             try: #properly destroy the instance map allocation on failure
@@ -132,7 +132,7 @@ class ParameterizedSingleton(type):
                 _instance = _instance()
             if _instance is instance:
                 #break the circular reference if it exists
-                instance.__prevent_gc__ = False
+                setattr(instance, '__prevent_gc__', False)
                 try: del classObj._instanceMap[ instanceID ]
                 except: pass #we may be racing the gc mechanism
                 return
@@ -298,11 +298,11 @@ if __name__ == '__main__':
 
     #instantiate some Foo Entities
     a = list(map(Foo, range(10)))
-    _print("\nCurrent map:\n%s\n" % str(Foo._instanceMap))
+    _print("\nCurrent map:\n%s\n" % str(len(Foo._instanceMap)))
     _print("\nGo go gadget GC\n")
     del a #once unbound automatic GC should kick in
 
-    _print("\n\nCurrent map:\n%s\n" % str(Foo._instanceMap))
+    _print("\n\nCurrent map:\n%s\n" % str(len(Foo._instanceMap)))
     #make sure runtime errors aren't thrown when the undelying dict is modified
     for obj in Foo.objects: #this is a generator accessing the dict
         _print("Reference Count of %s is %d" % (obj,weakref.getweakrefcount(obj)))
