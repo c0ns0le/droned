@@ -25,6 +25,21 @@ import sys as _sys
 import os as _os
 import re as _re
 
+__doc__ = """
+Romeo: Relational Object Mapping of Environmental Organization.
+
+Basically romeo provides a easy library to determine what runs
+where and how.  The underlying data format is YAML and is fully
+extensible.
+
+- Provides a presecriptive model of environments.
+- Provides programmatic access to information.
+- Provides relationships to disjoint information.
+- Supports inlining additional environment descriptions.
+- Supports encrypted fields.
+"""
+__author__ = "Justin Venus <justin.venus@orbitz.com>"
+
 try:
     from yaml import CLoader as _Loader
 except ImportError:
@@ -80,6 +95,8 @@ def reload(datadir=None):
     if not datadir:
         datadir = _os.getenv('ROMEO_DATA','/etc/hostdb')
     pp = Preprocessor(datadir)
+    entity.namespace.pop('romeo', None)
+    entity.namespace['romeo'] = set()
     for f in _glob.glob('%s/*.yaml' % (datadir,)):
         try:
             fd = open(f, 'r')
@@ -88,7 +105,9 @@ def reload(datadir=None):
             rd = _copy.deepcopy(_yaml.load(outstr, Loader=_Loader))
             rd.append({'FILENAME': f})
             pp.post_process(rd,f)
-            foundation.RomeoKeyValue('ENVIRONMENT', rd)
+            entity.namespace['romeo'].add(
+                foundation.RomeoKeyValue('ENVIRONMENT', rd)
+            )
         except: _traceback.print_exc()
     pp.shutdown()
     Preprocessor.delete(pp) #invalidate the Entity now
@@ -98,11 +117,7 @@ def listEnvironments():
 
        @return list of romeo.foundation.KeyValue instances
     """
-    x = set()
-    for node in foundation.RomeoKeyValue.objects:
-        if not node.ROOTNODE: continue
-        x.add(node)
-    return list(x)
+    return list(entity.namespace.get('romeo',[]))
 
 def getEnvironment(name):
     """Get an environment with the given ```name``` attribute in
@@ -145,6 +160,8 @@ import hostdb
 # Private Class becomes 'romeo' module on instantiation
 ###############################################################################
 class _Romeo(entity.Entity):
+    __author__ = __author__
+    __doc__ = __doc__
     def __init__(self):
         self._data = dict( (name,value) for name,value in globals().iteritems() )
         #this isn't as evil as it seems

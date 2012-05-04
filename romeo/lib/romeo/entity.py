@@ -30,6 +30,8 @@ try:
     from romeo.namespace import namespace
 except ImportError:
     namespace = {}
+#allocate a namespace for entities
+namespace.update({'entities': {}})
 
 import weakref
 
@@ -44,12 +46,15 @@ def _weak_decorator(func):
         result = func(cls, *args, **kwargs)
         if isinstance(result, weakref.ref):
             return result()
-        elif not result:
-            return result
         instanceID = result._instanceID
-        if not getattr(result, 'reapable', False):
-            #circular reference prevents gc
-            setattr(result, '__prevent_gc__', result)
+        if getattr(result, 'reapable', False):
+            namespace['entities'].get(
+                result.__class__.__name__, {}
+            ).pop(instanceID, None)
+        else:
+            namespace['entities'][result.__class__.__name__].update(
+                {instanceID: result}
+            )
         cls._instanceMap[instanceID] = weakref.ref(
             result, #making sure we clean up the map dict
             lambda x: cls._weak_callback(instanceID,x)
@@ -71,6 +76,9 @@ class ParameterizedSingleton(type):
         super(ParameterizedSingleton, classObj).__init__(name, bases, members)
         classObj._instanceMap = {}
         classObj.objects = ObjectsDescriptor()
+        #initialize namespace
+        if name not in namespace['entities']:
+            namespace['entities'][name] = {}
 
     @staticmethod
     def _safeID(*args, **kwargs):
@@ -81,10 +89,8 @@ class ParameterizedSingleton(type):
         except TypeError:
             return hash(_pickle.dumps(instanceID))
 
-    def _weak_callback(classObj, instanceId, obj):
-        if instanceId in classObj._instanceMap:
-            try: del classObj._instanceMap[instanceId]
-            except: pass #we may be racing ``delete``
+    def _weak_callback(classObj, instanceID, obj):
+        classObj._instanceMap.pop(instanceID, None)
 
     @_weak_decorator #we need this decorator for edge cases
     def __call__(classObj, *args, **kwargs):
@@ -106,10 +112,15 @@ class ParameterizedSingleton(type):
                 **kwargs
             )
 
-            classObj._instanceMap[instanceID].__prevent_gc__ = False
+            #classObj._instanceMap[instanceID].__prevent_gc__ = False
             classObj._instanceMap[instanceID]._instanceID = instanceID
+            # This will be converted to a weakref shortly
+            # so we need to make sure the instance doesn't
+            # gc unless it is suppossed to.  The decorator
+            # on this method will take care of breaking the 
+            # reference for us.
 
-            try: #properly destroy the instance map allocation on failure
+            try: # properly destroy the instance map allocation on failure
                 classObj._instanceMap[instanceID].__init__(*args, **kwargs)
             except:
                 if instanceID in classObj._instanceMap:
@@ -132,9 +143,11 @@ class ParameterizedSingleton(type):
                 _instance = _instance()
             if _instance is instance:
                 #break the circular reference if it exists
-                setattr(instance, '__prevent_gc__', False)
-                try: del classObj._instanceMap[ instanceID ]
-                except: pass #we may be racing the gc mechanism
+                namespace['entities'].get(
+                    _instance.__class__.__name__,
+                    {}
+                ).pop(instanceID, None)
+                classObj._instanceMap.pop(instanceID, None)
                 return
 
     def isValid(classObj, instance):
@@ -285,7 +298,7 @@ if __name__ == '__main__':
         def _weak_callback(classObj, instanceId, obj):
             if instanceId in classObj._instanceMap:
                 del classObj._instanceMap[instanceId]
-            _print("Reaping unbound object id: %s" % str(instanceId))
+            _print("Reaping unbound object id: Foo%s" % str(instanceId))
 
         def __init__(self, value):
             self.reapable = bool(value % 2) #odds will automatically reap
@@ -293,16 +306,18 @@ if __name__ == '__main__':
             if self.reapable:
                 _print("Foo(%d) will automatically gc when it leaves scope" % (value,))
             else:
-                _print("Foo(%d) will not gc without an explicite delete" % (value,))
+                _print("Foo(%d) will not gc without an explicit delete" % (value,))
             _print("")
 
     #instantiate some Foo Entities
     a = list(map(Foo, range(10)))
     _print("\nCurrent map:\n%s\n" % str(len(Foo._instanceMap)))
+    _print("\nCurrent namespace:\n%s\n" % str(len(namespace['entities']['Foo'])))
     _print("\nGo go gadget GC\n")
     del a #once unbound automatic GC should kick in
 
     _print("\n\nCurrent map:\n%s\n" % str(len(Foo._instanceMap)))
+    _print("\nCurrent namespace:\n%s\n" % str(len(namespace['entities']['Foo'])))
     #make sure runtime errors aren't thrown when the undelying dict is modified
     for obj in Foo.objects: #this is a generator accessing the dict
         _print("Reference Count of %s is %d" % (obj,weakref.getweakrefcount(obj)))
@@ -317,4 +332,5 @@ if __name__ == '__main__':
             _print('Unexpected Exception, re-raising')
             raise
         _print("")
-    _print("Current map:\n%s\n" % str(Foo._instanceMap))
+    _print("\nCurrent map:\n%s\n" % str(len(Foo._instanceMap)))
+    _print("\nCurrent namespace:\n%s\n" % str(len(namespace['entities']['Foo'])))
