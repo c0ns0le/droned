@@ -71,7 +71,7 @@ class RomeoKeyValue(Entity):
         self._ancestors = set()
 
         #we need to inspect our values and discover decendants
-        for obj in _processKeyValues({key: value}):
+        for obj in _processKeyValues({self.KEY: self.VALUE}):
              if obj is self: continue #skip dumb relationship to self
              self._children.add(obj)
              obj.add_ancestor(self)
