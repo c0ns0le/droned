@@ -20,7 +20,7 @@
 import struct, os, platform, time, re
 from kitt.interfaces import IKittProcModule, IKittProcess, \
         IKittProcessSnapshot, IKittLiveProcess, implements, moduleProvides
-
+moduleProvides(IKittProcModule)
 if platform.system() != 'SunOS':
     raise OSError("Sorry, only SunOS is supported")
 
@@ -30,7 +30,6 @@ if _sunos_version < 10:
 
 __author__ = 'Justin Venus <justin.venus@orbitz.com>'
 
-moduleProvides(IKittProcModule)
 
 #python3 readiness
 try:
@@ -180,7 +179,7 @@ class Process(_SunProc):
             #this exception is injected into the module on import
             raise AssertionError("Invalid PID (%s)" % pid)
         self.inode = os.stat(self.path).st_ino
-        _SolProc.__init__(self)
+        _SunProc.__init__(self)
 
     def isRunning(self):
         """is a process running
