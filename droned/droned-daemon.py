@@ -422,6 +422,7 @@ class ConfigManager(Entity):
             search = str('select ARTIFACT')
             for x in romeo.grammars.search(search):
                 if x.get('SHORTNAME') != i: continue
+                if isinstance(x.VALUE.get('CLASS', False), type(None)): continue
                 if not ENV_OBJECT.isChild(x):
                     continue #right artifact/wrong env check
                 APPLICATIONS[i.VALUE] = copy.deepcopy(x.VALUE)
