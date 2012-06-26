@@ -28,7 +28,7 @@ SERVICECONFIG = dictwrapper({
 
 from twisted.python.log import msg
 from twisted.python.failure import Failure
-from twisted.internet import defer, threads, task, reactor
+from twisted.internet import defer, threads, task
 from twisted.application.service import Service
 from droned.entity import Entity
 from droned.logging import logWithContext, err
@@ -127,7 +127,7 @@ class Journal(Service):
     def startService(self):
         self._task = task.LoopingCall(self.write)
         #delay first journaling
-        reactor.callLater(
+        config.reactor.callLater(
             config.JOURNAL_FREQUENCY, 
             self._task.start, 
             config.JOURNAL_FREQUENCY
