@@ -17,7 +17,7 @@
 #make version tracking easy
 from twisted.python.versions import Version, IncomparableVersions
 
-from twisted.internet import defer, task, reactor
+from twisted.internet import defer, task
 from twisted.python.failure import Failure
 from droned.errors import DroneCommandFailed
 from droned.logging import err, log

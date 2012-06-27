@@ -21,7 +21,6 @@ IDroneDService interface"""
 
 from twisted.python.failure import Failure
 from twisted.application.internet import TCPClient
-from twisted.internet import reactor
 from twisted.internet.task import LoopingCall
 from twisted.words.protocols.jabber.client import XMPPClientFactory
 from twisted.words.protocols.jabber.jid import JID
@@ -300,7 +299,7 @@ class JabberClient(object):
         self.stop()
         if failure.check(SASLAuthError):
             log('Will attempt to reconnect in 15 seconds...')
-            reactor.callLater(15, self.start)
+            config.reactor.callLater(15, self.start)
 #setup logging after class definition
 log = logWithContext(type=JabberClient.SERVICENAME)
 

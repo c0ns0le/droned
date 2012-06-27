@@ -14,7 +14,6 @@
 #   limitations under the License.
 ###############################################################################
 
-from twisted.internet import reactor
 from droned.models.server import Server
 from droned.models.droneserver import DroneD
 from droned.models.app import App, AppVersion, AppInstance
@@ -95,7 +94,7 @@ class Environment(Entity):
         for server in self._hostname_generator():
             server.listed = True
             if self.polling:
-                reactor.callLater(delay, server.startPolling)
+                config.reactor.callLater(delay, server.startPolling)
                 delay += config.SERVER_POLL_OFFSET
 
     def startPolling(self):
@@ -103,7 +102,7 @@ class Environment(Entity):
         self.polling = True
         delay = 0.0
         for server in self.servers:
-            reactor.callLater(delay, server.startPolling)
+            config.reactor.callLater(delay, server.startPolling)
             delay += config.SERVER_POLL_OFFSET
 
     def stopPolling(self):

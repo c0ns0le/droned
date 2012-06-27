@@ -14,9 +14,10 @@
 #   limitations under the License.
 ###############################################################################
 
-from twisted.internet import protocol, reactor
+from twisted.internet import protocol
 from droned.errors import DroneCommandFailed
 from droned.logging import logWithContext
+import config
 import re
 
 #if the app is fully managed by droned this will let us find it.
@@ -54,7 +55,7 @@ class ApplicationProtocol(protocol.ProcessProtocol):
        errback DroneCommandFailed() 
     """
     #just b/c I am a swell guy and you may need it
-    reactor = property(lambda s: reactor)
+    reactor = property(lambda s: config.reactor)
 
     def __init__(self, *args, **kwargs):
         self.deferredResult = args[-1] #deferred result is always the last arg

@@ -16,13 +16,13 @@
 
 import time
 from twisted.python.failure import Failure
-from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.words.xish.domish import escapeToXml
 from droned.entity import Entity
 from droned.context import EntityContext
 from droned.errors import ServiceNotAvailable
 import services
+import config
 
 from kitt.interfaces import IConversationContext, IDroneModelConversation,\
     IDroneModelChatRoom, implements
@@ -156,7 +156,7 @@ class Conversation(Entity):
         """Tells the remote party that an event occurred"""
         self.notificationQueue.append(event)
         if len(self.notificationQueue) == 1:
-            reactor.callLater(1, self.sendNotifications)
+            config.reactor.callLater(1, self.sendNotifications)
 
     def sendNotifications(self):
         """Formats and sends notification to the remote party"""
