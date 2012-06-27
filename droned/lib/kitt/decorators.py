@@ -52,7 +52,11 @@ def deferredInThreadPool(pool=None, R=None):
        @return (defer.Deferred)
     """
     if not R:
-        from twisted.internet import reactor
+        try:
+            import config
+            reactor = config.reactor
+        except:
+            from twisted.internet import reactor
         R = reactor
     if not pool: #provide a default thread pool
         pool = R.getThreadPool()
@@ -82,7 +86,11 @@ def synchronizedInThread(R=None):
        @return (object)
     """
     if not R:
-        from twisted.internet import reactor
+        try:
+            import config
+            reactor = config.reactor
+        except:
+            from twisted.internet import reactor
         R = reactor
     def decorator(func):
         def newfunc(*a, **kw):
@@ -105,7 +113,11 @@ def threadSafeDeferred(R=None):
        @return (defer.Deferred) 
     """
     if not R:
-        from twisted.internet import reactor
+        try:
+            import config
+            reactor = config.reactor
+        except:
+            from twisted.internet import reactor
         R = reactor
     def decorator(func): 
         def newfunc(*a, **kw):
@@ -131,7 +143,11 @@ def threadSafePoolDeferred(pool=None, R=None):
        @return (defer.Deferred) 
     """
     if not R:
-        from twisted.internet import reactor
+        try:
+            import config
+            reactor = config.reactor
+        except:
+            from twisted.internet import reactor
         R = reactor
     if not pool: #pick a thread pool
         pool = R.getThreadPool()
@@ -258,7 +274,11 @@ def retry(delay=0.25, maximum=10, trap=None, debug=False, fd=None,
         @defer.deferredGenerator
         def _deferred(deferredResult, caller):
             """only callable by ``newfunc``"""
-            from twisted.internet import reactor
+            try:
+                import config
+                reactor = config.reactor
+            except:
+                from twisted.internet import reactor
             result = None
             attempt = 0
             while attempt <= maximum:

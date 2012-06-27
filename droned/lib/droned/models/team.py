@@ -15,13 +15,13 @@
 ###############################################################################
 
 import os
-from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.internet.task import LoopingCall
 from droned.entity import Entity
 from droned.logging import log
 from droned.errors import ServiceNotAvailable
 import services
+import config
 
 #TODO bring inline with style guide
 #FIXME some of this doesn't make sense
@@ -77,7 +77,7 @@ class Team(Entity):
       roster = open(self.rosterPath, 'w')
       roster.write(content)
       roster.close()
-    reactor.callInThread(blockingWrite)
+    config.reactor.callInThread(blockingWrite)
 
   def addMember(self, jid):
     self.agents.add( SupportAgent(jid) )

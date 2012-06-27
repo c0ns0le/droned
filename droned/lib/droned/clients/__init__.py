@@ -127,7 +127,11 @@ def command(executable, args, env, path, usePTY, childFD, protocol,
             newargs += i.split(' ')
         args = tuple(newargs)
 
-    from twisted.internet import reactor
+    try: #dmx work around
+        import config
+        reactor = config.reactor
+    except:
+        from twisted.internet import reactor
     #setup the client application to run
     app = MyClientCreator(reactor, protocol, *proto_args, **proto_kwargs)
     deferredSpawn = app.spawn(executable, args, env, path, usePTY, childFD)
@@ -187,7 +191,11 @@ def connect(host, port, protocol, *proto_args, **proto_kwargs):
     else:
         timeout = None
 
-    from twisted.internet import reactor
+    try: #dmx work around
+        import config
+        reactor = config.reactor
+    except:
+        from twisted.internet import reactor
     connector = ClientCreator(reactor, protocol, *proto_args, **proto_kwargs)
     deferredConnect = connector.connectTCP(host, port)
 

@@ -14,7 +14,7 @@
 #   limitations under the License.
 ###############################################################################
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.python.failure import Failure
 from kitt.util import dictwrapper
 from kitt.decorators import debugCall, deferredAsThread
@@ -633,7 +633,7 @@ class _PluginFactory(object):
             'name': property(lambda s: name),
             'service': property(lambda s: IDroneModelAppManager(s)),
             'configuration': property(lambda s: pluginConfig),
-            'reactor': property(lambda s: reactor),
+            'reactor': property(lambda s: config.reactor),
             'STARTUP_INFO': {
                 'START_USEPTY' : 0,
                 'START_CHILDFD' : {0:'w',1:'r',2:'r'},

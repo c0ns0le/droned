@@ -52,7 +52,11 @@ def list_snapshots():
     return [ name[:-len(SUFFIX)] for name in os.listdir(config.JOURNAL_DIR) \
             if name.endswith(SUFFIX) ]
 
+# allow reapable entities a moment to be rebound
+temporary_storage = []
+
 def load():
+    global temporary_storage
     snapshots = sorted( map(int, list_snapshots()) )
     if not snapshots: return
     path = os.path.join(config.JOURNAL_DIR, str(snapshots[-1]) + SUFFIX)
@@ -62,7 +66,7 @@ def load():
     c = 0
     while True:
         try:
-            obj = Entity.deserialize(journal)
+            temporary_storage.append(Entity.deserialize(journal))
         except EOFError:
             journal.close()
             break
@@ -124,12 +128,17 @@ class Journal(Service):
             path = os.path.join(config.JOURNAL_DIR, str(timestamp) + SUFFIX)
             os.unlink(path)
 
+    def _start_hook(self, frequency):
+        global temporary_storage
+        temporary_storage = [] # wipe out reapable entities
+        self._task.start(frequency)
+
     def startService(self):
         self._task = task.LoopingCall(self.write)
         #delay first journaling
         config.reactor.callLater(
             config.JOURNAL_FREQUENCY, 
-            self._task.start, 
+            self._start_hook, 
             config.JOURNAL_FREQUENCY
         )
         #minimize the chances of losing started instances

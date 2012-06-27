@@ -44,8 +44,9 @@ from kitt.interfaces import implements, IDroneModelAppManager, \
 from droned.errors import DroneCommandFailed
 from kitt.decorators import *
 from twisted.python.failure import Failure
-from twisted.internet import defer, threads, reactor
+from twisted.internet import defer, threads
 from twisted.internet.task import LoopingCall
+import config
 
 #standard imports
 import os
@@ -71,7 +72,7 @@ class ApplicationEvent(Entity):
     """The Extents Eventing For AppManagers"""
     implements(IDroneModelApplicationEvent)
     serializable = False
-    reactor = property(lambda s: reactor)
+    reactor = property(lambda s: config.reactor)
 
     def __del__(self):
         if self.loop.running: self.loop.stop()
@@ -502,7 +503,7 @@ class AppManager(Entity):
             result = Failure(DroneCommandFailed(result))
         #AppInstances need a moment to be updated
         d = defer.Deferred()
-        reactor.callLater(1.0, d.callback, None)
+        config.reactor.callLater(1.0, d.callback, None)
         wfd = defer.waitForDeferred(d)
         yield wfd
         wfd.getResult()
@@ -784,7 +785,7 @@ class AppManager(Entity):
 
         #give the protocol handler and OS a moment to do their thing
         d = defer.Deferred()
-        reactor.callLater(0.2, d.callback, None)
+        config.reactor.callLater(0.2, d.callback, None)
         wfd = defer.waitForDeferred(d)
         yield wfd
         wfd.getResult()
@@ -799,7 +800,7 @@ class AppManager(Entity):
                     kung()
                     x = defer.Deferred()
                     #wait for the OS to reap the PID
-                    reactor.callLater(5.0, x.callback, None)
+                    config.reactor.callLater(5.0, x.callback, None)
                     wfd = defer.waitForDeferred(x)
                     yield wfd
                     wfd.getResult()
@@ -813,7 +814,7 @@ class AppManager(Entity):
                           (getException(), fu, pid, exc))
 
                 if not instanceRef.running: break
-                reactor.callLater(10, d.callback, None)
+                config.reactor.callLater(10, d.callback, None)
                 wfd = defer.waitForDeferred(d)
                 yield wfd
                 wfd.getResult() 

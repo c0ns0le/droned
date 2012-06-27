@@ -19,13 +19,13 @@ import time
 import types
 import traceback
 from twisted.python.failure import Failure
-from twisted.internet import reactor, defer
+from twisted.internet import defer
 from droned.entity import Entity
 from droned.errors import DroneCommandFailed, FormatError
 from droned.logging import logWithContext
 from kitt.util import getException
-from kitt.interfaces import implements, IDroneModelAction, \
-        IDroneModelAdminAction
+from kitt.interfaces import (
+    implements, IDroneModelAction, IDroneModelAdminAction)
 import config
 
 
@@ -50,7 +50,7 @@ class Action(Entity):
     def __finish(self, outcome):
         self.outcome = outcome
         self.finishedAt = time.time()
-        reactor.callLater(config.ACTION_EXPIRATION_TIME, Action.delete, self)
+        config.reactor.callLater(config.ACTION_EXPIRATION_TIME, Action.delete, self)
         return outcome
 
 

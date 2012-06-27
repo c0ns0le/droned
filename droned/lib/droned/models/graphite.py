@@ -16,11 +16,12 @@
 
 from zope.interface import Interface,Attribute,implements
 from droned.entity import Entity
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 from twisted.python.failure import Failure
 from kitt.decorators import synchronizedDeferred
 from kitt.util import dictwrapper
 from droned.clients import connect
+import config
 import time
 
 
@@ -258,7 +259,7 @@ class TimeSeriesData(Entity):
                     result += wfd.getResult()
                     if delay:
                         d = defer.Deferred()
-                        reactor.callLater(delay, d.callback, None)
+                        config.reactor.callLater(delay, d.callback, None)
                         wfd = defer.waitForDeferred(d)
                         yield wfd
                         wfd.getResult()

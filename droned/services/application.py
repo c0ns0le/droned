@@ -24,7 +24,7 @@ events accordingly.  This service is driven completely of of romeo.
 """
 
 from twisted.python.failure import Failure
-from twisted.internet import task, defer, reactor
+from twisted.internet import task, defer
 from twisted.application.service import Service
 from droned.logging import logWithContext, err
 from kitt.proc import listProcesses, isRunning
@@ -99,7 +99,7 @@ class ApplicationLoader(Service):
            'applist': self.applist_action,
        })
        #delay scanning by some interval
-       reactor.callLater(SERVICECONFIG.initial_delay, self._start_all_tasks)
+       config.reactor.callLater(SERVICECONFIG.initial_delay, self._start_all_tasks)
 
    def _start_all_tasks(self):
        self._task.start(SERVICECONFIG.recover_interval)
@@ -139,7 +139,7 @@ class ApplicationLoader(Service):
                if ai in self.tracking: continue
                if not self.first_run: #avoid process table races
                    self.tracking.add(ai)
-                   reactor.callLater(SERVICECONFIG.recovery_period,
+                   config.reactor.callLater(SERVICECONFIG.recovery_period,
                        self.tracking.discard, ai
                    )
                    if not ai.enabled: continue #skip disabled
@@ -179,7 +179,7 @@ class ApplicationLoader(Service):
            except:
                err('process book keeping error')
        d = defer.Deferred()
-       reactor.callLater(0.01, d.callback, None)
+       config.reactor.callLater(0.01, d.callback, None)
        wfd = defer.waitForDeferred(d)
        yield wfd
        wfd.getResult()
