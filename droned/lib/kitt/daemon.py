@@ -16,6 +16,9 @@
 import os
 import pwd
 
+__author__ = "Justin Venus <justin.venus@orbitz.com>"
+__doc__ = """Provide utilities for DroneD"""
+
 def owndir(USER, DIR):
     """behaves like chown -R $PATHSOMEWHERE and mkdir -p """
     uid,gid = pwd.getpwnam(USER)[2:4]
@@ -31,3 +34,56 @@ def owndir(USER, DIR):
                 try: os.chown(os.path.join(r, file), uid, gid)
                 except: pass
     except: pass
+
+###############################################################################
+# Watchdog Services
+###############################################################################
+
+from ctypes import *
+from ctypes.util import find_library
+import platform
+
+_platform = platform.system().lower()
+
+
+# default implementation
+timer = lambda: 0
+keep_alive = lambda: None
+
+if _platform == 'linux':
+    try: # systemd version 183+ watchdog support
+        systemd_daemon = CDLL( find_library("systemd-daemon") )
+
+        if not systemd_daemon._name:
+            raise ImportError("could not find systemd support")
+
+        # <systemd/sd-daemon>
+        systemd_daemon.sd_notify.argtypes = [c_int, c_char_p]
+        systemd_daemon.sd_notify.restypes = c_int
+
+        def timer():
+            """Provides a mechanism to setup the timer"""
+            return float(os.environ.get('WATCHDOG_USEC',0))/2.0
+
+        def keep_alive():
+            """Notify SystemD that we are alive"""
+            return systemd_daemon.sd_notify(0, "WATCHDOG=1")
+    except ImportError: pass
+
+
+from twisted.internet.task import LoopingCall
+
+class WatchDog(LoopingCall):
+    def __init__(self):
+        LoopingCall.__init__(self, keep_alive) # this platform methods will keep us alive
+        self.__run = timer() # value > 0 allows this task to run
+
+    def start(self):
+        if self.__run:
+            LoopingCall.start(self, self.__run)
+
+    def stop(self):
+        if self.running:
+            return self.stop()
+
+__all__ = ['owndir','WatchDog']

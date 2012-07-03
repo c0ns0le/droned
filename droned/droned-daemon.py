@@ -695,7 +695,7 @@ config.reactor.fireSystemEvent('droned-configured')
 ###############################################################################
 # Setup Log Handlers
 ###############################################################################
-from kitt.daemon import owndir
+from kitt.daemon import owndir, WatchDog
 owndir(config.DRONED_USER, config.DRONED_HOMEDIR)
 owndir(config.DRONED_USER, config.DRONED_WEBROOT)
 owndir(config.DRONED_USER, config.JOURNAL_DIR)
@@ -754,9 +754,15 @@ drone.reactor.addSystemEventTrigger('before', 'shutdown',
 ###############################################################################
 # Signal Handler and Reactor Startup
 ###############################################################################
+watchdog = WatchDog()
 
 #the signal handler must be installed after the reactor is running!!!
 drone.reactor.callWhenRunning(drone.suppress_signals)
+drone.reactor.callWhenRunning(watchdog.start)
+#watch dog setup
+drone.reactor.addSystemEventTrigger('during', 'shutdown',
+    watchdog.stop
+)
 #last step, turn the reactor loose
 drone.log('DroneD is starting the reactor.')
 drone.reactor.run()

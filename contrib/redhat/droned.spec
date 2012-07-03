@@ -8,7 +8,7 @@
 
 Name:		droned
 Version:        0.9.0
-Release:	8%{?dist}
+Release:	9%{?dist}
 Summary:	DroneD - Application Service Framework	
 
 Group:		System Environment/Daemons
@@ -255,6 +255,9 @@ fi
 
 
 %changelog
+* Tue Jun  3 2012 Justin Venus <justin.venus@orbitz.com> 0.9.0-9
+- Added SystemD (version 183+) WATCHDOG support to droned.
+
 * Wed Apr 11 2012 Justin Venus <justin.venus@orbitz.com> 0.9.0-3
 - cleaning up the specfile - jciesla
 
