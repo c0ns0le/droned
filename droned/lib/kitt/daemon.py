@@ -69,6 +69,8 @@ if _platform == 'linux':
             """Notify SystemD that we are alive"""
             return systemd_daemon.sd_notify(0, "WATCHDOG=1")
     except ImportError: pass
+# For Solaris we can base the code off of the following example
+# http://docs.oracle.com/cd/E19874-01/820-4443-11/appendix1.html
 
 
 from twisted.internet.task import LoopingCall
