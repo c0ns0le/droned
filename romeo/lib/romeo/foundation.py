@@ -62,6 +62,7 @@ class RomeoKeyValue(Entity):
     RELATED = property(lambda s: (i for i in s._ancestors | s._children))
     ROOTNODE = property(lambda s: not bool(s._ancestors))
     BRANCHNODE = property(lambda s: not s.ROOTNODE)
+    serializable = property(lambda s: s.ROOTNODE)
 
     def __init__(self, key, value):
         self._key = key
@@ -75,6 +76,13 @@ class RomeoKeyValue(Entity):
              if obj is self: continue #skip dumb relationship to self
              self._children.add(obj)
              obj.add_ancestor(self)
+
+    def __getstate__(self):
+        return {'KEY': self._key, 'VALUE': self._value}
+
+    @staticmethod
+    def construct(state):
+        return RomeoKeyValue(state['KEY'], state['VALUE'])
 
     def keys(self):
         """return all of the keys of my children"""

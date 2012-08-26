@@ -40,6 +40,9 @@ extensible.
 """
 __author__ = "Justin Venus <justin.venus@orbitz.com>"
 
+#This is used by the createrdb utility. DONOT Modify it
+CACHEDB = 'cache'
+
 try:
     from yaml import CLoader as _Loader
 except ImportError:
@@ -91,12 +94,26 @@ def reload(datadir=None):
        @param datadir (string) - directory
        @return None
     """
-    from romeo.directives import Preprocessor
     if not datadir:
         datadir = _os.getenv('ROMEO_DATA','/etc/hostdb')
-    pp = Preprocessor(datadir)
     entity.namespace.pop('romeo', None)
     entity.namespace['romeo'] = set()
+    cachedb = _os.path.join(datadir, CACHEDB)
+
+    if _os.path.exists(cachedb):
+        fd = open(cachedb, 'rb')
+        while True:
+            try:
+                entity.namespace['romeo'].add(
+                    foundation.RomeoKeyValue.deserialize(fd)
+                )
+            except EOFError:
+                fd.close()
+                return
+            except: continue
+
+    from romeo.directives import Preprocessor
+    pp = Preprocessor(datadir)
     for f in _glob.glob('%s/*.yaml' % (datadir,)):
         try:
             fd = open(f, 'r')
