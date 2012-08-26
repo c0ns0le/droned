@@ -113,6 +113,45 @@ class _ConfigResource(Resource):
         """
         return yaml_dumper(data, Dumper=Dumper, default_flow_style=False)
 
+    def value_serialize(self, data, request):
+        """Take a python object and extract the values and apply a delimitter.
+
+           @param data C{object}
+           @return C{str}
+        """
+        def default_pack(d):
+            if isinstance(d, (str,int,float,bool)):
+                return str(d)
+        output = []
+        delimiter = request.args.get('delimiter', ['\n'])[0]
+        if 'pickle' in request.args.get('format', []):
+            request.setHeader("Content-Type", "text/x-pickle.python")
+            func = self.pickle_serialize
+        elif 'yaml' in request.args.get('format', []):
+            request.setHeader("Content-Type", "text/yaml")
+            func = self.yaml_serialize
+        elif 'json' in request.args.get('format', []):
+            request.setHeader("Content-Type", "application/json")
+            func = self.json_serialize
+        else:
+            request.setHeader("Content-Type", "text/plain")
+            func = default_pack
+        #if this is a dictionary it is an early item in the tree
+        if isinstance(data, dict):
+            for o in data.values():
+                value = func(o)
+                if not value:
+                    output += o
+                    continue
+                output.append(value)
+        else: #this is the normal use case
+            for item in data:
+                for o in item.values():
+                    value = func(o)
+                    if not value: continue
+                    output.append(value)
+        return delimiter.join(output)
+
     def getChild(self, name, request):
         """overrode to get child resource if applicable"""
         r = self.children.get(name, self)
@@ -121,6 +160,8 @@ class _ConfigResource(Resource):
 
     @resource_error
     def render_GET(self, request):
+        if 'values' in request.args.get('format', []):
+            return self.value_serialize(self.OUTPUT_DATA, request)
         if 'pickle' in request.args.get('format', []):
             request.setHeader("Content-Type", "text/x-pickle.python")
             return self.pickle_serialize(self.OUTPUT_DATA)
@@ -212,7 +253,7 @@ class RomeoResource(_ConfigResource):
         if hasattr(self.data, '__iter__') and not isinstance(self.data, dict):
             self.data = [ make_dict(d) for d in self.data ]
         else:
-            self.data = make_dict(self.data)
+            self.data = [ make_dict(self.data) ]
         return self.data
 
 
