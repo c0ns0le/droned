@@ -1,0 +1,53 @@
+#!/usr/bin/python
+from twisted.python.failure import Failure
+from twisted.python.util import println
+import romeo
+import sys
+import os
+
+__author__ = "Justin Venus <justin.venus@gmail.com>"
+__doc__ = """
+    This utility creates an optimized cache for faster romeo library 
+    initialization times.  It is completely optional to cache romeo.
+"""
+cachedb = None
+cache = None
+cached = 0
+suffix = 's.'
+
+
+try:
+    directory = os.path.abspath(sys.argv[1])
+    if not os.path.exists(directory):
+        raise IndexError()
+    cachedb = os.path.join(directory, romeo.CACHEDB)
+    if os.path.exists(cachedb):
+        os.remove(cachedb)
+    romeo.reload(datadir=directory)
+    cache = open(cachedb, 'wb')
+except IndexError:
+    sys.stderr.write('Error: Must specify a directory to index.\n')
+    sys.stderr.flush()
+    sys.exit(1)
+except:
+    failure = Failure()
+    sys.stderr.write(failure.getErrorMessage()+'\n')
+    sys.stderr.flush()
+    sys.exit(1)
+
+
+for environment in romeo.listEnvironments():
+    try:
+        cache.write(environment.serialize())
+        cached += 1
+    except:
+        failure = Failure()
+        sys.stderr.write(failure.getErrorMessage()+'\n')
+
+
+if cached == 1:
+    suffix = '.'
+
+
+println('Indexed %d environment%s' % (cached, suffix))
+cache.close()

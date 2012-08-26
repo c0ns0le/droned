@@ -63,7 +63,8 @@ if _platform == 'linux':
 
         def timer():
             """Provides a mechanism to setup the timer"""
-            return float(os.environ.get('WATCHDOG_USEC',0))/2.0
+            #microseconds take the half live of the environment value
+            return float(os.environ.get('WATCHDOG_USEC',0))/2000000.0
 
         def keep_alive():
             """Notify SystemD that we are alive"""

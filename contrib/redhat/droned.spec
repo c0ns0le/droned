@@ -7,8 +7,8 @@
 %endif
 
 Name:		droned
-Version:        0.9.0
-Release:	9%{?dist}
+Version:        0.9.1
+Release:	1%{?dist}
 Summary:	DroneD - Application Service Framework	
 
 Group:		System Environment/Daemons
@@ -51,6 +51,18 @@ Isn't this the job of a CMDB?
 Answer:
 Find me a well documented CMDB API that is also an OSS CMDB that integrates 
 well with DroneD and I will happily retire Romeo.
+
+
+%package -n romeo-utils
+Summary:	Command line utilities for manipulating romeo files
+Group:		Applications/System
+Requires:	python-romeo 
+Requires:	python-twisted
+
+
+%description -n romeo-utils
+This utils package installs a number of command line tools for
+manipulating romeo environment description files.
 
 
 %package service
@@ -237,6 +249,15 @@ fi
 %defattr(-,root,root,-)
 %doc LICENSE README NEWS romeo/example/*
 %dir %{_sysconfdir}/hostdb
+%exclude %{_bindir}/rls
+%exclude %{_bindir}/createrdb
+
+
+%files -n romeo-utils
+%defattr(-,root,root,-)
+%doc LICENSE
+%{_bindir}/rls
+%{_bindir}/createrdb
 
 
 %files service
@@ -255,6 +276,11 @@ fi
 
 
 %changelog
+* Sun Aug 26 2012 Justin Venus <justin.venus@orbitz.com> 0.9.1-1
+- Added caching to romeo library
+- Added new commandline utility createrdb
+- Minor version bump
+
 * Tue Jun  3 2012 Justin Venus <justin.venus@orbitz.com> 0.9.0-9
 - Added SystemD (version 183+) WATCHDOG support to droned.
 
