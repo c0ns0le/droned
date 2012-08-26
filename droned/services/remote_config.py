@@ -175,7 +175,7 @@ class _ConfigResource(Resource):
 class ConfigResouce(_ConfigResource):
     """HTTP Resource /remote_config"""
     isLeaf = False
-    OUTPUT_DATA = property(lambda s: {'URL_HANDLERS': s.children.keys()})
+    OUTPUT_DATA = property(lambda s: {'RESOURCES': s.children.keys()})
 
     def __init__(self):
         _ConfigResource.__init__(self)
