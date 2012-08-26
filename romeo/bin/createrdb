@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 from twisted.python.failure import Failure
 from twisted.python.util import println
 import romeo
@@ -17,7 +17,7 @@ suffix = 's.'
 
 
 try:
-    directory = sys.argv[1]
+    directory = os.path.abspath(sys.argv[1])
     if not os.path.exists(directory):
         raise IndexError()
     cachedb = os.path.join(directory, romeo.CACHEDB)
