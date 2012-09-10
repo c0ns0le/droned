@@ -6,6 +6,12 @@
 %define systemd 1
 %endif
 
+%if (0%{?rhel} < 6)
+%define ghost_safe 0
+%else
+%define ghost_safe 1
+%endif
+
 Name:		droned
 Version:        0.9.1
 Release:	1%{?dist}
@@ -239,8 +245,10 @@ fi
 %endif
 %dir /var/log/%{name}
 %dir %{_sysconfdir}/pki/%{name}
+%if %{ghost_safe}
 %ghost %attr(600,root,root) %{_sysconfdir}/pki/%{name}/local.private
 %ghost %attr(644,root,root) %{_sysconfdir}/pki/%{name}/local.public
+%endif
 %dir %{_datadir}/%{name}
 %dir /var/lib/%{name}
 
