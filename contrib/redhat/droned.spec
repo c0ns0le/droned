@@ -27,6 +27,7 @@ BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildRequires:	%{__python}
 Requires:	python-twisted
 Requires:	python-romeo
+Requires:	python-ctypes
 Requires(post):	openssl
 
 
@@ -41,6 +42,7 @@ network communication.
 Summary:	Relational Object Mapping of Environmental Organization
 Group:		Development/Languages
 Requires:	PyYAML
+Requires:	python-ctypes
 
 
 %description -n python-romeo
