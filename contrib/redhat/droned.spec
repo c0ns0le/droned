@@ -8,8 +8,10 @@
 
 %if (0%{?rhel} < 6)
 %define ghost_safe 0
+%define need_simplejson 1
 %else
 %define ghost_safe 1
+%define need_simplejson 0
 %endif
 
 Name:		droned
@@ -43,6 +45,9 @@ Summary:	Relational Object Mapping of Environmental Organization
 Group:		Development/Languages
 Requires:	PyYAML
 Requires:	python-ctypes
+%if %{need_simplejson}
+Requires:	python-simplejson
+%endif
 
 
 %description -n python-romeo
