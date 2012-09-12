@@ -1,9 +1,10 @@
 #!/usr/bin/python
 from twisted.python.failure import Failure
 from twisted.python.util import println
-import romeo
-import sys
 import os
+os.environ.update({'ROMEO_IGNORE_FQDN': "1"})
+import sys
+import romeo
 
 __author__ = "Justin Venus <justin.venus@gmail.com>"
 __doc__ = """
