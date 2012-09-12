@@ -15,10 +15,11 @@
 #   limitations under the License.
 ###############################################################################
 
+import os
 import re
 import sys
-import romeo
 
+os.environ.update({'ROMEO_IGNORE_FQDN': "1"})
 DEBUG = False #global debug
 
 #output formatters
@@ -286,6 +287,7 @@ class Options(usage.Options, object):
         'Enable python stacktraces to stderr'
         global DEBUG
         DEBUG = True
+        os.environ.pop('ROMEO_IGNORE_FQDN', None)
 
     def parseArgs(self, path=internal_seperator):
         """We extract the RLS path which should be the last argument."""
@@ -295,6 +297,8 @@ class Options(usage.Options, object):
 
     def postOptions(self):
         """we will apply the values option to the format at this stage."""
+        #avoid circular references
+        import romeo
         if self._rls_values:
             formatOpts = self._rls_args.get('format', []) + ['values']
             self._rls_args.update({'format': formatOpts})
