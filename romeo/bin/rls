@@ -67,6 +67,7 @@ def make_dict(romeo_key_value):
        @raises L{exceptions.TypeError} on invalid input
        @return C{dict}
     """
+    import romeo
     if isinstance(romeo_key_value, dict): return romeo_key_value
     if not isinstance(romeo_key_value, romeo.foundation.RomeoKeyValue):
         raise TypeError('%s is not a RomeoKeyValue' % str(romeo_key_value))
@@ -173,6 +174,7 @@ class EnvironmentResource(_ConfigResource):
 
     def getChild(self, name, request):
         if name in self.environments:
+            import romeo
             return RomeoResource(name, romeo.getEnvironment(name))
         return _ConfigResource.getChild(self, name, request)
 
@@ -184,6 +186,7 @@ class ServerResource(_ConfigResource):
 
     def getChild(self, name, request):
         if name in self.servers:
+            import romeo
             return RomeoResource(name, romeo.whoami(name))
         return _ConfigResource.getChild(self, name, request)
 
@@ -206,6 +209,7 @@ class RomeoResource(_ConfigResource):
     @resource_error
     def getChild(self, name, request):
         """overrode to route us on our way"""
+        import romeo
         if not name: return self
         #allow servers to get back to their environment for global information
         if name.upper() == 'ENVIRONMENT' and self.entity.KEY == 'SERVER':
