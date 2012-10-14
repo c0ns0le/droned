@@ -14,6 +14,9 @@
 %define need_simplejson 0
 %endif
 
+#adding explicit python2 requirement
+%{?__python2: %define __python %__python2}
+
 Name:		droned
 Version:        0.9.1
 Release:	1%{?dist}
