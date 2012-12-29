@@ -15,10 +15,11 @@
 #   limitations under the License.
 ###############################################################################
 
+import os
 import re
 import sys
-import romeo
 
+os.environ.update({'ROMEO_IGNORE_FQDN': "1"})
 DEBUG = False #global debug
 
 #output formatters
@@ -66,6 +67,7 @@ def make_dict(romeo_key_value):
        @raises L{exceptions.TypeError} on invalid input
        @return C{dict}
     """
+    import romeo
     if isinstance(romeo_key_value, dict): return romeo_key_value
     if not isinstance(romeo_key_value, romeo.foundation.RomeoKeyValue):
         raise TypeError('%s is not a RomeoKeyValue' % str(romeo_key_value))
@@ -172,6 +174,7 @@ class EnvironmentResource(_ConfigResource):
 
     def getChild(self, name, request):
         if name in self.environments:
+            import romeo
             return RomeoResource(name, romeo.getEnvironment(name))
         return _ConfigResource.getChild(self, name, request)
 
@@ -183,6 +186,7 @@ class ServerResource(_ConfigResource):
 
     def getChild(self, name, request):
         if name in self.servers:
+            import romeo
             return RomeoResource(name, romeo.whoami(name))
         return _ConfigResource.getChild(self, name, request)
 
@@ -205,6 +209,7 @@ class RomeoResource(_ConfigResource):
     @resource_error
     def getChild(self, name, request):
         """overrode to route us on our way"""
+        import romeo
         if not name: return self
         #allow servers to get back to their environment for global information
         if name.upper() == 'ENVIRONMENT' and self.entity.KEY == 'SERVER':
@@ -286,6 +291,7 @@ class Options(usage.Options, object):
         'Enable python stacktraces to stderr'
         global DEBUG
         DEBUG = True
+        os.environ.pop('ROMEO_IGNORE_FQDN', None)
 
     def parseArgs(self, path=internal_seperator):
         """We extract the RLS path which should be the last argument."""
@@ -295,6 +301,8 @@ class Options(usage.Options, object):
 
     def postOptions(self):
         """we will apply the values option to the format at this stage."""
+        #avoid circular references
+        import romeo
         if self._rls_values:
             formatOpts = self._rls_args.get('format', []) + ['values']
             self._rls_args.update({'format': formatOpts})

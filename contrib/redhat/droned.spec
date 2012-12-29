@@ -6,6 +6,17 @@
 %define systemd 1
 %endif
 
+%if (0%{?rhel} < 6)
+%define ghost_safe 0
+%define need_simplejson 1
+%else
+%define ghost_safe 1
+%define need_simplejson 0
+%endif
+
+#adding explicit python2 requirement
+%{?__python2: %define __python %__python2}
+
 Name:		droned
 Version:        0.9.1
 Release:	1%{?dist}
@@ -21,6 +32,7 @@ BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildRequires:	%{__python}
 Requires:	python-twisted
 Requires:	python-romeo
+Requires:	python-ctypes
 Requires(post):	openssl
 
 
@@ -35,6 +47,10 @@ network communication.
 Summary:	Relational Object Mapping of Environmental Organization
 Group:		Development/Languages
 Requires:	PyYAML
+Requires:	python-ctypes
+%if %{need_simplejson}
+Requires:	python-simplejson
+%endif
 
 
 %description -n python-romeo
@@ -239,8 +255,10 @@ fi
 %endif
 %dir /var/log/%{name}
 %dir %{_sysconfdir}/pki/%{name}
+%if %{ghost_safe}
 %ghost %attr(600,root,root) %{_sysconfdir}/pki/%{name}/local.private
 %ghost %attr(644,root,root) %{_sysconfdir}/pki/%{name}/local.public
+%endif
 %dir %{_datadir}/%{name}
 %dir /var/lib/%{name}
 
