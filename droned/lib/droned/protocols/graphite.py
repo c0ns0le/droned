@@ -20,9 +20,9 @@ except ImportError:
     import pickle
 from twisted.internet.protocol import Protocol
 from twisted.python.failure import Failure
-from twisted.protocols.basic import Int32StringReceiver
+from twisted.protocols.basic import LineReceiver
 
-class GraphiteProtocol(Int32StringReceiver):
+class GraphiteProtocol(LineReceiver):
     """base protocol for sending metrics to a Graphite Receiver"""
     metric = property(lambda s: s.get_metric())
     def __init__(self, *args, **kwargs):
@@ -36,7 +36,7 @@ class GraphiteProtocol(Int32StringReceiver):
     def connectionMade(self):
         data = self.metric
         if data: #if we don't have data don't write
-            self.sendString(data)
+            self.sendLine(data)        
             self.METRIC_SENT = True
         self.transport.loseConnection()
 
