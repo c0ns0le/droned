@@ -217,7 +217,7 @@ class TimeSeriesData(Entity):
         if self.pending:
             metrics = set()
             for stamp, value in self.dataPoints.iteritems():
-                metrics.add((self.metricID, (stamp, value)))
+                metrics.add((self.metricID, (value,stamp)))
             proto_args = (list(metrics),)
             proto_kwargs = {'timeout': timeout}
             try:
@@ -230,7 +230,6 @@ class TimeSeriesData(Entity):
             except:
                 result = Failure()
         yield result
-
 
     @staticmethod
     @defer.deferredGenerator
