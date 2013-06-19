@@ -19,7 +19,6 @@ try:
 except ImportError:
     import pickle
 from twisted.internet.protocol import Protocol
-from twisted.python.failure import Failure
 from twisted.protocols.basic import LineReceiver, Int32StringReceiver
  
  
