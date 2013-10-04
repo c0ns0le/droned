@@ -373,7 +373,7 @@ class _Cache(type):
 
 #basically wrap exceptions on instantiation and cache instances
 #Process = _Cache('Process', (Process,), {})
-LiveProcess = _Cache('LiveProcess', (LiveProcess,), {})
+#LiveProcess = _Cache('LiveProcess', (LiveProcess,), {})
 #ProcessSnapshot = _Cache('ProcessSnapshot', (ProcessSnapshot,), {})
 
 from kitt.decorators import deferredAsThread, synchronizedDeferred
